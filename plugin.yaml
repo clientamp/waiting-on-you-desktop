@@ -1,0 +1,25 @@
+name: waiting-on-you-desktop
+version: 1.0.0
+description: Track when agents are waiting on you, with quadrant-sorted tasks and durable close/snooze memory.
+author: Dave Swift
+homepage: https://daveswift.com/waiting-on-you
+license: MIT
+requires_hermes: ">=0.21.5"
+provides_tools:
+  - wou_list
+provides_hooks:
+  - post_llm_call
+provides_middleware: []
+requires_env: []
+tags: [desktop, tasks, productivity, covey]
+config_schema:
+  WOU_TYPESAFE_API_KEY: {type: secret, env: WOU_TYPESAFE_API_KEY, required: false, label: "TypeSafe API key"}
+  WOU_CLOUDFLARE_API_TOKEN: {type: secret, env: WOU_CLOUDFLARE_API_TOKEN, required: false, label: "Cloudflare API token"}
+  WOU_PERPLEXITY_API_KEY: {type: secret, env: WOU_PERPLEXITY_API_KEY, required: false, label: "Perplexity API key"}
+  WOU_OPENAI_API_KEY: {type: secret, env: WOU_OPENAI_API_KEY, required: false, label: "OpenAI API key"}
+  WOU_DECISION_API_KEY: {type: secret, env: WOU_DECISION_API_KEY, required: false, label: "Custom decision API key"}
+  decision_provider: {type: str, default: "", choices: ["", jev, clef, clef-flash, perplexity, perplexity-flash, openai, ollama, custom], required: false, description: "Optional decision model for scan gating, priority scoring, and automatic tags."}
+  decision_model: {type: str, default: "", required: false}
+  decision_base_url: {type: str, default: "", required: false, description: "Full custom endpoint, or Ollama base URL (appends /v1/systemone)."}
+  cloudflare_account_id: {type: str, default: "", required: false}
+  decision_timeout: {type: float, default: 20, required: false, description: "Decision request timeout in seconds."}

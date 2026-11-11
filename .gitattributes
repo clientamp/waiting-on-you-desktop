@@ -1,0 +1,4 @@
+# Release git archive / export must not ship local interaction harness trees or generated bundles
+# (bundled `../../../../` paths in esbuild output trigger plugin guard path_traversal caution).
+scratch/ export-ignore
+scratch/** export-ignore

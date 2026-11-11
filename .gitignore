@@ -1,0 +1,11 @@
+node_modules/
+scratch/**/dist/
+scratch/**/dist-*/
+__pycache__/
+artifacts/
+*.db
+.hermes/
+.hermes/*.log
+HANDOFF.md
+scripts/install_local.sh
+.DS_Store
