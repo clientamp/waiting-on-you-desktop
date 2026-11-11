@@ -11,10 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_release_versions_and_documented_install_commands():
     for manifest in ('plugin.yaml', 'satellite/plugin.yaml'):
-        assert re.search(r'^version: 1\.0\.0$', (ROOT / manifest).read_text(), re.M)
+        assert re.search(r'^version: 1\.0\.1$', (ROOT / manifest).read_text(), re.M)
     package = json.loads((ROOT / 'package.json').read_text())
     lock = json.loads((ROOT / 'package-lock.json').read_text())
-    assert package['version'] == lock['version'] == lock['packages']['']['version'] == '1.0.0'
+    assert package['version'] == lock['version'] == lock['packages']['']['version'] == '1.0.1'
     readme = (ROOT / 'README.md').read_text()
     assert 'hermes plugins install clientamp/waiting-on-you-desktop --enable' in readme
     assert 'hermes plugins install waiting-on-you-desktop --enable' in readme

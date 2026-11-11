@@ -264,16 +264,16 @@ export const globalStyles = `
 }
 .${ROOT_CLASS} .wou-row-follow-selected {
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--wou-accent) 55%, var(--wou-border));
-  background: color-mix(in srgb, var(--wou-accent) 14%, var(--wou-card));
+  border: 1px solid color-mix(in srgb, var(--wou-accent) 18%, var(--wou-border));
+  background: color-mix(in srgb, var(--wou-accent) 5%, var(--wou-card));
   padding-left: 8px;
   padding-right: 8px;
   margin: 2px 0;
 }
 .${ROOT_CLASS} .wou-group-follow-selected > .wou-group-parent {
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--wou-accent) 55%, var(--wou-border));
-  background: color-mix(in srgb, var(--wou-accent) 14%, var(--wou-card));
+  border: 1px solid color-mix(in srgb, var(--wou-accent) 18%, var(--wou-border));
+  background: color-mix(in srgb, var(--wou-accent) 5%, var(--wou-card));
   padding-left: 8px;
   padding-right: 8px;
   margin: 2px 0;
@@ -2077,8 +2077,8 @@ export const globalStyles = `
 .${ROOT_CLASS}.wou-layout-cards .wou-section > .wou-row.wou-row-follow-selected:not(.wou-row-nested),
 .${ROOT_CLASS}.wou-layout-cards .wou-flat-list > .wou-row.wou-row-follow-selected:not(.wou-row-nested),
 .${ROOT_CLASS}.wou-layout-cards .wou-section > .wou-group.wou-group-follow-selected {
-  border-color: color-mix(in srgb, var(--wou-accent) 55%, var(--wou-border));
-  background: color-mix(in srgb, var(--wou-accent) 14%, var(--wou-card));
+  border-color: color-mix(in srgb, var(--wou-accent) 18%, var(--wou-border));
+  background: color-mix(in srgb, var(--wou-accent) 5%, var(--wou-card));
 }
 /* The whole card carries the highlight, so the header inside it does not draw a second box. */
 .${ROOT_CLASS}.wou-layout-cards .wou-section > .wou-group.wou-group-follow-selected > .wou-group-parent {
@@ -2124,9 +2124,87 @@ export const globalStyles = `
 .${ROOT_CLASS}.wou-layout-compact .wou-row-nested,
 .${ROOT_CLASS}.wou-layout-focus .wou-row-nested { padding: 4px 0; }
 
+/* ---- Quiet metadata: agent, project, tags and due read as text, not buttons ---- */
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) {
+  margin-top: 6px;
+  column-gap: 0;
+  row-gap: 2px;
+  font-size: 12px;
+  color: var(--wou-muted);
+}
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > :is(.wou-agent-chip, .wou-badge, .wou-project-chip, .wou-tag-chip, .wou-due-chip),
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > button.wou-project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--wou-muted);
+}
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > .wou-tag-chip:not(.wou-tag-chip-more) {
+  color: color-mix(in srgb, var(--wou-tag-hue) 70%, var(--wou-fg));
+}
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > :is(.wou-due-today, .wou-due-overdue) {
+  color: color-mix(in srgb, var(--wou-tag-red) 80%, var(--wou-fg));
+  font-weight: 500;
+}
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > .wou-due-overdue { font-weight: 600; }
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > button.wou-project-chip:hover {
+  color: var(--wou-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > button.wou-project-chip:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wou-accent) 60%, transparent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+/* A middle dot between neighbouring items: "Ada · Demo · Due today". */
+.${ROOT_CLASS} :is(.wou-meta, .wou-nested-meta) > :is(.wou-agent-chip, .wou-badge, .wou-project-chip, .wou-tag-chip, .wou-due-chip) ~ :is(.wou-agent-chip, .wou-badge, .wou-project-chip, .wou-tag-chip, .wou-due-chip)::before {
+  content: '·';
+  content: '·' / '';
+  margin: 0 6px;
+  color: var(--wou-muted);
+  font-weight: 400;
+  text-decoration: none;
+  display: inline-block;
+}
+/* Metadata sits under the ask, above the answer buttons. */
+.${ROOT_CLASS} .wou-row-body > :is(.wou-meta, .wou-nested-meta) + .wou-answer { margin-top: 8px; }
+
 /* ---- Answer bar: Yes · No · Reply · Later · Open session ---- */
-/* The selected task: a quiet accent edge, so it reads apart from the followed-chat box. */
-.${ROOT_CLASS} .wou-row.wou-row-active { box-shadow: inset 3px 0 0 var(--wou-accent); }
+/* The selected task: a quiet neutral tint, no edge bar. Sub-items carry their own inline padding
+   (offset by an equal negative margin so text stays aligned) and a little space between them, so
+   the tint frames the checkbox and never sits on a neighbouring ask's text. */
+.${ROOT_CLASS} {
+  --wou-active-tint: color-mix(in srgb, var(--wou-fg) 4%, transparent);
+}
+.${ROOT_CLASS} .wou-row.wou-row-active {
+  background: var(--wou-active-tint);
+  border-radius: 6px;
+}
+.${ROOT_CLASS} .wou-group-children > .wou-row-nested {
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  border-radius: 6px;
+}
+.${ROOT_CLASS} .wou-group-children > .wou-row-nested + .wou-row-nested { margin-top: 4px; }
+.${ROOT_CLASS}.wou-layout-cards .wou-group-children > .wou-row-nested { padding-top: 8px; padding-bottom: 8px; }
+.${ROOT_CLASS}.wou-layout-cards .wou-group-children > .wou-row-nested:first-child { margin-top: 4px; }
+.${ROOT_CLASS}.wou-layout-cards .wou-section > .wou-row.wou-row-active:not(.wou-row-nested),
+.${ROOT_CLASS}.wou-layout-cards .wou-flat-list > .wou-row.wou-row-active:not(.wou-row-nested) {
+  background: color-mix(in srgb, var(--wou-fg) 4%, var(--wou-card));
+  border-radius: 10px;
+}
 .${ROOT_CLASS} .wou-row[data-wou-task-id]:focus { outline: none; }
 .${ROOT_CLASS} .wou-answer { margin-top: 8px; }
 .${ROOT_CLASS} .wou-answer-bar {
@@ -2135,7 +2213,46 @@ export const globalStyles = `
   align-items: center;
   gap: 6px;
 }
-.${ROOT_CLASS} .wou-answer-bar .wou-action-btn { font-size: 12px; padding: 3px 10px; }
+/* Answer buttons keep one text/background pair in every state, so their contrast is exactly
+   the theme's own: secondary buttons are fg on card, Yes is Hermes's contrast-adjusted
+   solid-primary pair (or, on hosts without it, the inverse fg/card pair). Hover and press
+   show through the border and shadow, never by blending the fill toward the text colour. */
+.${ROOT_CLASS} .wou-answer-bar .wou-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 12px;
+  border-radius: 6px;
+  color: var(--wou-fg);
+  background: var(--wou-card);
+  border: 1px solid color-mix(in srgb, var(--wou-fg) 30%, var(--wou-border));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--wou-fg) 16%, transparent);
+  transition: border-color 80ms ease, box-shadow 80ms ease;
+}
+.${ROOT_CLASS} .wou-answer-bar .wou-action-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--wou-fg) 60%, var(--wou-border));
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--wou-fg) 24%, transparent);
+}
+.${ROOT_CLASS} .wou-answer-bar .wou-action-btn:active:not(:disabled) {
+  border-color: color-mix(in srgb, var(--wou-fg) 60%, var(--wou-border));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--wou-fg) 28%, transparent);
+  transform: translateY(1px);
+}
+.${ROOT_CLASS} .wou-answer-bar .wou-action-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wou-accent) 60%, transparent);
+  outline-offset: 1px;
+}
+.${ROOT_CLASS} .wou-answer-bar .wou-action-btn.wou-answer-yes,
+.${ROOT_CLASS} .wou-answer-bar .wou-action-btn.wou-answer-yes:hover:not(:disabled),
+.${ROOT_CLASS} .wou-answer-bar .wou-action-btn.wou-answer-yes:active:not(:disabled) {
+  color: var(--dt-primary-solid-foreground, var(--wou-card));
+  background: var(--dt-primary-solid, var(--wou-fg));
+  border-color: var(--dt-primary-solid, var(--wou-fg));
+}
 .${ROOT_CLASS} .wou-answer-open {
   display: inline-flex;
   align-items: center;

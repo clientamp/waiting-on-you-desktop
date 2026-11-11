@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — 2026-11-11
+
+- Calmer task cards: the selected task gets a soft tint instead of a blue left bar, so nothing cuts through a sub-item's checkbox, and the tint keeps clear of neighbouring asks
+- Agent, project, tags and due date read as one quiet text line above the answer buttons, so they no longer look like buttons
+- Yes, No, Reply, Later and Open session look and behave like buttons, and keep readable contrast at rest, on hover and when pressed in every built-in Hermes theme
+
 ## 1.0.0 — 2026-11-11
 
 - Catalog name is now `waiting-on-you-desktop` (another plugin uses `waiting-on-you`); tasks and settings stay in `plugin-data/waiting-on-you`, and older `plugins.entries.waiting-on-you` settings are still read

@@ -1,5 +1,5 @@
 name: waiting-on-you-desktop
-version: 1.0.0
+version: 1.0.1
 description: Track when agents are waiting on you, with quadrant-sorted tasks and durable close/snooze memory.
 author: Dave Swift
 homepage: https://daveswift.com/waiting-on-you

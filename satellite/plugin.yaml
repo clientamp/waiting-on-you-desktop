@@ -1,5 +1,5 @@
 name: waiting-on-you-satellite
-version: 1.0.0
+version: 1.0.1
 description: Install on every other Hermes so Waiting On You can see its chats. Sends changed chats to your main Waiting On You. Never calls a model.
 author: Dave Swift
 license: MIT

@@ -461,6 +461,33 @@ export function TaskRow({
         {contextLine && detailsOpen ? (
           <div className="wou-task-context wou-task-context-open">{contextLine}</div>
         ) : null}
+        {/* Metadata (agent, project, tags, due) sits with the ask, above the answer buttons. */}
+        {!nested && metaHasChips ? (
+          <div className="wou-meta">
+            {showAgentChip ? <span className="wou-agent-chip">{task.agent}</span> : null}
+            {closed ? null : <DueChip dueAt={task.due_at} now={updatedNow} />}
+            {projectChip}
+            <TagChips tags={tags} />
+            {closed ? chatMeta : null}
+            {closed && onReopen ? (
+              <button type="button" onClick={() => onReopen(task)}>{strings.reopen}</button>
+            ) : null}
+          </div>
+        ) : tags.length > 0 || task.due_at ? (
+          <div className="wou-nested-meta">
+            <DueChip dueAt={task.due_at} now={updatedNow} />
+            <TagChips tags={tags} />
+            {closed && onReopen ? (
+              <button type="button" onClick={() => onReopen(task)}>{strings.reopen}</button>
+            ) : null}
+          </div>
+        ) : closed && onReopen ? (
+          <div className="wou-meta">
+            {closed && onReopen ? (
+              <button type="button" onClick={() => onReopen(task)}>{strings.reopen}</button>
+            ) : null}
+          </div>
+        ) : null}
         {pendingLabel ? (
           <div className="wou-pending-label" role="status">{pendingLabel}</div>
         ) : aiQuick ? (
@@ -505,32 +532,6 @@ export function TaskRow({
               </button>
             </div>
           </form>
-        ) : null}
-        {!nested && metaHasChips ? (
-          <div className="wou-meta">
-            {showAgentChip ? <span className="wou-agent-chip">{task.agent}</span> : null}
-            {closed ? null : <DueChip dueAt={task.due_at} now={updatedNow} />}
-            {projectChip}
-            <TagChips tags={tags} />
-            {closed ? chatMeta : null}
-            {closed && onReopen ? (
-              <button type="button" onClick={() => onReopen(task)}>{strings.reopen}</button>
-            ) : null}
-          </div>
-        ) : tags.length > 0 || task.due_at ? (
-          <div className="wou-nested-meta">
-            <DueChip dueAt={task.due_at} now={updatedNow} />
-            <TagChips tags={tags} />
-            {closed && onReopen ? (
-              <button type="button" onClick={() => onReopen(task)}>{strings.reopen}</button>
-            ) : null}
-          </div>
-        ) : closed && onReopen ? (
-          <div className="wou-meta">
-            {closed && onReopen ? (
-              <button type="button" onClick={() => onReopen(task)}>{strings.reopen}</button>
-            ) : null}
-          </div>
         ) : null}
       </div>
       {nested ? overflowMenu : null}
