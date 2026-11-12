@@ -10,6 +10,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_catalog_declares_bounded_yaml_runtime_dependency():
+    import yaml
+
+    manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text())
+    assert manifest.get("python_dependencies") == ["PyYAML>=6,<7"]
+
+
 def test_catalog_python_uses_only_public_hermes_cli_imports():
     allowed = {"hermes_cli.config", "hermes_cli.plugin_events", "hermes_cli.dashboard_auth"}
     for base in (ROOT / "wou", ROOT / "dashboard", ROOT / "satellite"):
