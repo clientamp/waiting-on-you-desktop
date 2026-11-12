@@ -84,7 +84,7 @@ def clip(s: str | None, n: int) -> str:
 def hermes_home_from_env() -> Path:
     # A secondary profile hosting the root install must scan the hub's homes.
     # Otherwise that profile's state.db is labeled "default" and written into
-    # the shared task list. Standalone `python3 -` and the satellite copy have
+    # the shared task list. Standalone `python3 -` readers have
     # neither import, so a missing hub just means HERMES_HOME / ~/.hermes.
     hub_fn = None
     try:
@@ -191,11 +191,6 @@ def profile_display_map(
         out[profile["name"]] = profile_display_name(profile["name"], cfg.agent_names)
     for host in cfg.remote_hosts:
         out[host["name"]] = profile_display_name(host["name"], cfg.agent_names)
-    if data_dir is not None:
-        from .satellite_hub import satellite_profile_display_map
-
-        db_path = str(Path(data_dir).expanduser() / "wou.db")
-        out.update(satellite_profile_display_map(db_path, cfg))
     return out
 
 
@@ -777,18 +772,6 @@ def collect_all(
     notes: list[str] = []
     cfg.successful_sources.clear()
     cfg.collection_activity.clear()
-    satellite_names: set[str] = set()
-    if data_dir is not None:
-        from .satellite_hub import (
-            active_satellite_name_set,
-            satellite_chats_for_collect,
-            satellite_offline_notes,
-        )
-
-        db_path = str(Path(data_dir).expanduser() / "wou.db")
-        satellite_names = {n.lower() for n in active_satellite_name_set(db_path)}
-        chats.extend(satellite_chats_for_collect(db_path, cfg, now=now))
-        notes.extend(satellite_offline_notes(db_path, now=now))
 
     for profile in cfg.local_profiles:
         pname = profile["name"]
@@ -824,8 +807,6 @@ def collect_all(
             )
 
     for host in cfg.remote_hosts:
-        if host["name"].lower() in satellite_names:
-            continue
         rows, note = run_remote(host, cfg, cache_dir)
         if note:
             notes.append(note)

@@ -21,7 +21,7 @@ A Hermes plugin that watches your agent chats and builds a live task list of wha
 - Tags with colors and optional hints; automatic tagging is opt-in with a decision provider
 - “Why is this here?” shows the agent reply that triggered the task
 - Optional archive of a chat when its last unfinished task is marked done
-- All Hermes profiles on this Mac, plus other Macs through a small satellite plugin (see [Other machines](#other-machines))
+- All Hermes profiles on this Mac, plus optional read-only SSH collection from other machines (see [Other machines](#other-machines))
 
 All screenshots use made-up demo chats.
 
@@ -47,7 +47,7 @@ All screenshots use made-up demo chats.
 
 ## Requirements
 
-- Hermes **≥ 0.21.5** on macOS or Linux (Windows scanning is untested; use WSL or a remote hub)
+- Hermes **≥ 0.21.5** on macOS or Linux (Windows scanning is untested; use WSL)
 - **Hermes Desktop** for the side panel (the list UI)
 
 ## Install
@@ -94,9 +94,9 @@ Outbound paths (no telemetry):
 - **Suggest tags:** sends up to 200 recent chat titles, project names, and existing tag names to that Hermes model.
 - **Priority evaluation:** on explicit confirmation, sends chat excerpts and task context through the classifier and optional decision provider to compare predictions with labels. Evaluated tasks’ labels are held out of calibration examples.
 - **Optional decision provider:** receives chat excerpts for gating; asks, context, due dates, projects, priority note/corrections, and tag names/hints for priority/tag scoring. Preset hosts: `api.typesafe.ai`, `api.cloudflare.com`, `api.perplexity.ai`, `api.openai.com`; Ollama/custom uses your configured endpoint. Connection tests send synthetic data only.
-- **Satellite → hub:** sends chat excerpts/metadata and the Hermes project catalog to your paired hub, authenticated by a satellite token. The hub stores at most 2,000 chat rows per satellite, keeping the most recently active rows. Optional legacy SSH collection reads configured remote chat databases.
+- **SSH collection (optional, off by default):** reads chat databases on remote hosts you list under `remote_hosts`, read-only. Nothing is written on those hosts.
 
-Model-backed chat features require first-run consent. Choose providers and hub addresses you trust.
+Model-backed chat features require first-run consent. Choose providers and SSH hosts you trust.
 
 Tasks and settings live under `~/.hermes/plugin-data/waiting-on-you/` (files are created mode `0600` where the OS allows).
 
@@ -164,7 +164,7 @@ Read-only, compact output: `{"total": N, "tasks": [...]}`. Returns the 20 most i
 
 Optional arguments: `quadrant` (1–4), `limit` (1–200), `project` (exact name or key, case-insensitive), and `tag` (exact name, case-insensitive). Filters combine; `total` counts all matching tasks before the limit. Example: `{"project":"default:project-id","tag":"Client","limit":10}`.
 
-Projects come only from Hermes, never the classifier. Local keys are `<profile>:<project_id>`; satellite keys are `<satellite>:<profile>:<project_id>` to avoid cross-machine collisions. No manual project override exists. First use of this version backs up the old task database beside itself as `wou.db.bak-pre-hermes-projects-<timestamp>`, then removes the plugin’s old project assignments. The old table is retained empty.
+Projects come only from Hermes, never the classifier. Keys are `<profile>:<project_id>`. No manual project override exists. First use of this version backs up the old task database beside itself as `wou.db.bak-pre-hermes-projects-<timestamp>`, then removes the plugin’s old project assignments. The old table is retained empty.
 
 ## Settings
 
@@ -188,7 +188,7 @@ Editable in the panel (stored in `settings.json` in the plugin data directory):
 | Group by (`group_by`) | `priority` | `priority`, `project`, or `none`; old `show_priorities: false` migrates to `none` |
 | Show project badges | on | on / off |
 
-Lookback controls **new-chat discovery**, not whether an unanswered task is kept. Unanswered tasks are kept forever by default, including existing settings files without `retention_days`. Expiry is opt-in: set a positive retention period to clear an unanswered task only when a successful source read confirms the chat has had no activity for that many days. These tasks appear in history as **Cleared for age · not answered**, with status `expired`, and can be reopened. They are not counted as resolved or done. Missing or unavailable sources, and partial satellite snapshots, are not completion evidence. Manual tasks, tasks with a future due date, future snoozes, and user-locked priorities do not expire this way. When a snooze wakes, its wake time starts a fresh retention window.
+Lookback controls **new-chat discovery**, not whether an unanswered task is kept. Unanswered tasks are kept forever by default, including existing settings files without `retention_days`. Expiry is opt-in: set a positive retention period to clear an unanswered task only when a successful source read confirms the chat has had no activity for that many days. These tasks appear in history as **Cleared for age · not answered**, with status `expired`, and can be reopened. They are not counted as resolved or done. Missing or unavailable sources are not completion evidence. Manual tasks, tasks with a future due date, future snoozes, and user-locked priorities do not expire this way. When a snooze wakes, its wake time starts a fresh retention window.
 
 Consent is stored explicitly in `settings.json`. Missing, unreadable, or old settings without a consent value require **Start** again; creating a manual task never grants model access. Existing `consented: true` settings are preserved. The legacy 10-day discovery default is retained only for valid pre-consent settings files, not inferred from task data.
 
@@ -226,11 +226,9 @@ Inside **`collect`**:
 - **`agent_names`** — map profile or remote host name → display name in the panel
 - **`skip_title_prefixes`** / **`skip_title_contains`** — chat titles to skip when scanning
 - **`local_profiles`** — the complete list of `{name, state_db}` entries to watch when overriding the default `~/.hermes` layout; it replaces discovery, rather than adding to it
-- **`remote_hosts`** — legacy SSH collection; use a [satellite](#other-machines) instead. `{name, ssh_host, state_db}`, read-only from the remote `state.db`. If the host is down the panel shows a warning, and the old cached copy is never sent to the model again.
+- **`remote_hosts`** — legacy SSH collection, off unless you add entries. `{name, ssh_host, state_db}`, read-only from the remote `state.db`. If the host is down the panel shows a warning, and the old cached copy is never sent to the model again.
 
 When `local_profiles` is omitted, the scanner uses `HERMES_HOME` or `~/.hermes`: root `state.db` as profile `default` and each `profiles/<name>/state.db`.
-
-Plain HTTP to a satellite hub is only allowed for literal `localhost`, loopback, private, link-local, or CGNAT addresses (for example `http://127.0.0.1:8787`). Use `https://` for ordinary hostnames.
 
 ### Card actions
 
@@ -288,43 +286,15 @@ The same actions are available from the command palette.
 | Settings or projects return 404 | The dashboard may still be running old code — restart the Hermes dashboard / Desktop app and `hermes gateway restart`. |
 | “Can't reach Hermes. Retrying…” | Gateway or network issue; confirm `hermes gateway` is up and Desktop can reach it. |
 | Nothing appears | Finish **Start** on first run, set mode to something other than `off`, or check whether the daily limit was reached (you can still **Scan now** with confirmation). |
-| “… can't be reached” banner | That machine's chats are not coming in. For a satellite, run `hermes waiting-on-you-satellite status` on it. For an SSH host, check `ssh <host>` works without a password prompt. |
-| A machine's tasks show up twice | It was paired under a different name than before. Remove it in **Settings → Other machines** and pair again with the old name. |
+| “… can't be reached” banner | That SSH host's chats are not coming in. Check that `ssh <host>` works without a password prompt. |
 
 ## Other machines
 
-Waiting On You keeps one task list on one Hermes, **the hub**. It already reads every profile on the hub's Mac. To add chats from another Mac (or another Hermes home), install the small **satellite** plugin there. The satellite reads that Hermes's chats and sends changes to the hub every couple of minutes. It never calls a model and never sees your task list.
+Waiting On You reads every Hermes profile on the Mac where it runs. To include chats from another machine, add it under `remote_hosts` in `config.json` (see [Advanced config](#advanced-config-configjson)). The plugin then reads that machine's `state.db` over SSH, read-only. SSH collection is off until you add a host.
 
-If your hub was originally installed under the older plugin name `waiting-on-you`, update every satellite to the current satellite package first, then update the hub to `waiting-on-you-desktop`. Satellites still running the old pairing against a hub that has only been upgraded under the new name will not be able to reach it.
+Satellite pairing, where a small plugin on another Hermes pushed its chats to this one, is not part of this release. No pairing or push endpoints ship, and **Settings** has no Other machines section. Pairing can return only after Hermes supports token-authenticated plugin routes through a public API ([hermes-agent#151760](https://github.com/NousResearch/hermes-agent/pull/151760), [hermes-agent#143507](https://github.com/NousResearch/hermes-agent/issues/143507)). If you paired machines with an earlier version, remove the satellite plugin from them. Existing satellite records in `wou.db` are left in place and ignored.
 
-**1. Find your hub address.** This is the hub's Hermes dashboard address as the other Mac sees it. The dashboard listens on port `9119` by default.
-
-- Tailscale: expose the dashboard with Tailscale Serve and use `https://<hub-name>.<tailnet>.ts.net:9119`.
-- Same home network: `http://192.168.1.10:9119` (replace with the hub's literal private IP), if the dashboard listens on the network. **Plain HTTP sends the satellite token and chat excerpts unencrypted on the LAN. Hostnames, including `.local`, require HTTPS. Prefer Tailscale Serve with HTTPS (for example `https://hub.example.ts.net`) or another HTTPS endpoint.**
-
-Plain `http` is only allowed for `localhost` and literal loopback, private, link-local, or CGNAT IP addresses. Hostnames, including `.local`, require HTTPS; public IP addresses also require HTTPS.
-
-**2. Make a pairing code on the hub.** Open **Waiting On You → Settings → Other machines → Add a machine**.
-
-- **Name**: a short id such as `studio`. Use one satellite per Hermes home. A Mac running three Hermes profiles needs three satellites with three names.
-- **Moving a machine from SSH to a satellite?** Remove its `remote_hosts` entry first, then pair with the old name (for example `juno`) so existing tasks carry over. Pairing rejects names still used by an SSH host or local profile. A different name creates duplicate tasks.
-- The code works once and expires after 10 minutes. Settings shows the exact command to run.
-
-**3. On the other Mac:**
-
-```bash
-# Copy the satellite folder from this repo into that Hermes home
-cp -R satellite ~/.hermes/plugins/waiting-on-you-satellite   # use that Hermes's HERMES_HOME if it is not ~/.hermes
-hermes plugins enable waiting-on-you-satellite
-hermes waiting-on-you-satellite pair <hub_address> <code>   # prints "Paired as <name>. Sent N chats."
-hermes gateway restart
-```
-
-**4. Check it.** On the satellite, `hermes waiting-on-you-satellite status` shows the last successful send and any error. On the hub, **Settings → Other machines** shows “Sending tasks · updated …”.
-
-To disconnect, click **Remove** on the hub, or run `hermes waiting-on-you-satellite unpair` on the satellite.
-
-**What is read:** chats from Hermes Desktop, the terminal UI and WebUI from the last 10 days. Chats in messaging apps (Telegram, Slack and so on) and cron runs are not read, on the hub or on satellites.
+**What is read:** chats from Hermes Desktop, the terminal UI and WebUI. Chats in messaging apps (Telegram, Slack and so on) and cron runs are not read.
 
 ## Uninstall
 

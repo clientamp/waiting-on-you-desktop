@@ -7,7 +7,7 @@ import sqlite3
 from unittest.mock import patch
 
 import pytest
-from wou import satellite_hub as hub
+from wou.chat_rows import _validate_chat_row
 
 
 @pytest.mark.parametrize('projects', [[{'key': 'p', 'name': 'P', 'profile': 1}], [{'key': 'p', 'name': 'P'}] * 2001])
@@ -41,14 +41,6 @@ def test_scan_does_not_stop_for_other_failure_patterns(tmp_path, mode):
     assert not result['model_unreachable']
 
 
-def test_auth_rechecks_routes_after_registration(monkeypatch):
-    from wou import satellite_auth as auth
-    from hermes_cli.dashboard_auth import token_auth
-    monkeypatch.setattr(token_auth, '_token_routes', set(auth.TOKEN_ROUTES) | {'/api/other/read'})
-    monkeypatch.setattr(auth, '_provider_registered', True)
-    monkeypatch.setattr(auth, '_registration_reason', '')
-    assert not auth.ensure_registered(lambda: 'unused')[0]
-
 
 def test_scan_connection_stop_ignores_no_model_skips(tmp_path):
     from wou.scanner import Scanner
@@ -63,15 +55,6 @@ def test_scan_connection_stop_ignores_no_model_skips(tmp_path):
     assert result['skipped_chats'] == 1
     assert result['model_unreachable']
 
-
-def test_satellite_session_connection_mapping(tmp_path):
-    from tests_py.test_api import _load_api_module
-    api = _load_api_module()
-    api.plugin_data_directory = lambda: str(tmp_path)
-    code, _ = api._satellite_hub.create_pair_code(str(tmp_path / 'wou.db'), 'node', 'A', ['node-connection'], 'default', hermes_home=tmp_path)
-    api._satellite_hub.redeem_pair_code(str(tmp_path / 'wou.db'), code, 'h', '1')
-    cfg = api._collect.Config.from_dict({'local_profiles': [], 'remote_hosts': []})
-    assert api._resolve_chat_key('session', 'default', 'node-connection', cfg) == 'node:session'
 
 
 @pytest.mark.parametrize('route', ['/tasks', '/session-tasks'])
@@ -97,17 +80,11 @@ def test_hardening_privacy_and_release_notes():
     readme = (root / 'README.md').read_text()
     assert 'up to 8 of your own priority corrections from other chats' in readme
     assert 'task ask + chosen quadrant' in readme
-    assert '2,000 chat rows per satellite' in readme
+
     release = (root / 'CHANGELOG.md').read_text().split('## Unreleased')[0]
     assert '### Hardening' in release
     assert 'three matching connection failures' in release
 
-
-def test_pair_name_cannot_shadow_configured_remote(tmp_path):
-    from wou import satellite_hub
-    (tmp_path / 'config.json').write_text(json.dumps({'collect': {'remote_hosts': [{'name': 'Office'}]}}))
-    with pytest.raises(ValueError, match='name already in use'):
-        satellite_hub.create_pair_code(str(tmp_path / 'wou.db'), 'office', 'A', [], None, hermes_home=tmp_path)
 
 
 def test_card_action_route_restored_for_external_producers():
@@ -117,18 +94,6 @@ def test_card_action_route_restored_for_external_producers():
     assert route.methods == {'POST'}
     assert route.endpoint is api.run_task_action
 
-
-def test_foreign_token_route_fails_closed(satellite, monkeypatch):
-    from wou import satellite_auth as auth
-    from hermes_cli.dashboard_auth import token_auth
-    db, sid = satellite
-    monkeypatch.setattr(token_auth, '_token_routes', set(auth.TOKEN_ROUTES) | {'/api/other/read'})
-    monkeypatch.setattr(auth, '_provider_registered', False)
-    monkeypatch.setattr(auth, '_registration_reason', '')
-    monkeypatch.setattr(auth, 'verify_satellite_token', lambda *_: sid)
-    assert not auth.ensure_registered(lambda: db)[0]
-    assert auth.WaitingOnYouSatelliteProvider(lambda: db).verify_token(token='wousat_test') is None
-    assert not auth.registration_state()[0]
 
 
 def test_sql_clips_content_before_fetch(tmp_path, monkeypatch):
@@ -256,48 +221,13 @@ def chat(cid='chat', at=100):
                 last_msg_id='1', last_role='assistant', user_last='', agent_last='Reply')
 
 
-@pytest.fixture
-def satellite(tmp_path):
-    db = str(tmp_path / 'wou.db')
-    code, _ = hub.create_pair_code(db, 'sat', 'Agent', [], None, hermes_home=tmp_path)
-    sid, *_ = hub.redeem_pair_code(db, code, 'host', '1')
-    return db, sid
-
-
 @pytest.mark.parametrize('value', [True, float('nan'), float('inf'), -float('inf'), 10 ** 400])
 def test_reject_nonfinite_activity(value):
     with pytest.raises(ValueError, match='last_active'):
-        hub._validate_chat_row(chat(at=value), 0)
+        _validate_chat_row(chat(at=value), 0)
 
 
 @pytest.mark.parametrize('value', [123, [], 'x' * 65])
-def test_project_profile_bound(satellite, value):
-    db, sid = satellite
+def test_project_profile_bound(value):
     with pytest.raises(ValueError, match='profile'):
-        hub.ingest(db, sid, dict(chats=[], full=False, version='1',
-                   projects=[dict(key='p', name='Project', profile=value)]))
-
-
-def test_satellite_keeps_newest_rows_without_touching_other_satellites(satellite):
-    db, sid = satellite
-    code, _ = hub.create_pair_code(db, 'other', 'Agent', [], None)
-    other, *_ = hub.redeem_pair_code(db, code, 'host', '1')
-    def push(s, rows):
-        hub.ingest(db, s, dict(chats=rows, full=False, version='1'))
-    from wou.store import Store
-    store = Store(db)
-    local_id = store.add_manual_task('local-chat', 'A', 'T', 'Local task', 'Local', 2)
-    local_before = store.get_task(local_id)
-    store.close()
-    with patch.object(hub, 'MAX_SATELLITE_CHATS', 2, create=True):
-        push(other, [chat('other')])
-        push(sid, [chat('new', 300), chat('old', 100)])
-        push(sid, [chat('middle', 200)])
-        with sqlite3.connect(db) as conn:
-            assert set(conn.execute('SELECT satellite_id,chat_id FROM satellite_chats')) == {
-                (sid, 'new'), (sid, 'middle'), (other, 'other')}
-    store = Store(db)
-    try:
-        assert store.get_task(local_id) == local_before
-    finally:
-        store.close()
+        _validate_chat_row(dict(chat(), project=dict(key='p', name='Project', profile=value)), 0)

@@ -7,7 +7,7 @@ export interface OfflineMachine {
   since: string | null
 }
 
-// Matches collect.run_remote and satellite_hub notes:
+// Matches collect.run_remote notes:
 //   "<name> unreachable (<err>); using <name> list cached <when>"
 //   "<name> unreachable (<err>); no <name> cache yet"
 // The scanner cuts notes at 200 characters, so only the prefix is required;

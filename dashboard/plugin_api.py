@@ -49,8 +49,7 @@ _hermes_sessions = importlib.import_module("wou.hermes_sessions")
 _collect = importlib.import_module("wou.collect")
 _config = importlib.import_module("wou.config")
 _usage = importlib.import_module("wou.usage")
-_satellite_hub = importlib.import_module("wou.satellite_hub")
-_satellite_auth = importlib.import_module("wou.satellite_auth")
+
 _ai_title = importlib.import_module("wou.ai_title")
 _decision = importlib.import_module("wou.decision")
 _assist = importlib.import_module("wou.assist")
@@ -95,10 +94,7 @@ def _stop_background() -> None:
 router.add_event_handler("shutdown", _stop_background)
 
 _MAX_BODY = 4 * 1024
-_MAX_PUSH_BODY = 1024 * 1024
-_PUSH_RATE_LIMIT = 30
-_PUSH_RATE_WINDOW = 60.0
-_push_rate: dict[str, list[float]] = {}
+
 _SCAN_COOLDOWN = 20.0
 _FORCE_SCAN_COOLDOWN = 2.0
 _last_manual_scan_at: float = 0.0
@@ -131,10 +127,6 @@ def _db_path() -> str:
     return str(_data_dir() / "wou.db")
 
 
-_SATELLITE_ENABLED, _SATELLITE_DISABLE_REASON = _satellite_auth.ensure_registered(
-    _db_path
-)
-
 
 def _chat_targets():
     """Map a chat_key to where Desktop can open it: {session_id, profile, connection}."""
@@ -142,25 +134,14 @@ def _chat_targets():
     cfg = _collect.Config.from_dict(config.get("collect") or {})
     local = {str(p.get("name", "")).lower() for p in cfg.local_profiles}
     remote = {str(h.get("name", "")).lower(): h for h in cfg.remote_hosts}
-    db_path = _db_path()
+
 
     def target(chat_key):
         if ":" not in chat_key:
             return {"session_id": chat_key, "profile": None, "connection": None}
         prefix, sid = chat_key.split(":", 1)
         prefix = prefix.lower()
-        sat = _satellite_hub.satellite_by_name(db_path, prefix)
-        if sat is not None:
-            names = [str(c) for c in sat.get("connections") or [] if c]
-            if not names:
-                return None
-            prof = sat.get("desktop_profile") or "default"
-            return {
-                "session_id": sid,
-                "profile": prof,
-                "connection": names[0],
-                "connection_aliases": names,
-            }
+
         if prefix in remote:
             host = remote[prefix]
             conn = host.get("desktop_connection")
@@ -299,9 +280,7 @@ def _resolve_chat_key(
         for host in collect_cfg.remote_hosts:
             if str(host.get("desktop_connection") or "") == conn:
                 return f"{host['name'].lower()}:{session_id}"
-        for satellite in _satellite_hub.list_satellites(_db_path()):
-            if satellite.get("revoked_at") is None and conn in satellite.get("connections", []):
-                return f"{satellite['name'].lower()}:{session_id}"
+
         return _local_chat_key_if_session_exists(session_id, profile, collect_cfg)
     # Desktop allocates local ids before persisting a session's first prompt.
     # Trust the configured profile, not the presence of its deferred DB row.
@@ -330,11 +309,7 @@ def _agent_for_chat_key(chat_key: str, collect_cfg: Any) -> str:
                 prof["name"],
                 _collect.profile_display_name(prof["name"], collect_cfg.agent_names),
             )
-    if _satellite_hub.satellite_by_name(_db_path(), prefix) is not None:
-        full_map = _collect.profile_display_map(collect_cfg, data_dir=_data_dir())
-        for key, display in full_map.items():
-            if key.lower() == prefix:
-                return display
+
     return prefix.capitalize()
 
 
@@ -1092,8 +1067,7 @@ async def list_projects():
                         projects[project["key"]] = dict(project, open_count=0)
                 except (OSError, ValueError, KeyError, TypeError):
                     pass
-            for project in _satellite_hub.satellite_projects(_db_path()):
-                projects[project["key"]] = dict(project, open_count=0)
+
             no_project = 0
             for task in store.list_tasks():
                 project = task["project"]
@@ -1506,206 +1480,6 @@ async def ai_title(request: Request):
     finally:
         async with _ai_title_inflight_lock:
             _ai_title_inflight.discard(inflight_key)
-
-
-def _token_principal(request: Request):
-    return getattr(request.state, "token_principal", None)
-
-
-def _require_pair_principal(request: Request) -> tuple[str | None, JSONResponse | None]:
-    principal = _token_principal(request)
-    if principal is None:
-        return None, JSONResponse({"error": "unauthenticated"}, status_code=401)
-    if principal.provider != _satellite_auth.PROVIDER_NAME or not str(
-        principal.principal
-    ).startswith("wou-pair:"):
-        return None, JSONResponse({"error": "unauthorized"}, status_code=401)
-    return str(principal.principal).split(":", 1)[1], None
-
-
-def _require_sat_principal(request: Request) -> tuple[str | None, JSONResponse | None]:
-    principal = _token_principal(request)
-    if principal is None:
-        return None, JSONResponse({"error": "unauthenticated"}, status_code=401)
-    if principal.provider != _satellite_auth.PROVIDER_NAME or not str(
-        principal.principal
-    ).startswith("wou-sat:"):
-        return None, JSONResponse({"error": "unauthorized"}, status_code=401)
-    return str(principal.principal).split(":", 1)[1], None
-
-
-def _push_rate_ok(satellite_id: str, now: float) -> bool:
-    window_start = now - _PUSH_RATE_WINDOW
-    hits = [t for t in _push_rate.get(satellite_id, []) if t > window_start]
-    if len(hits) >= _PUSH_RATE_LIMIT:
-        _push_rate[satellite_id] = hits
-        return False
-    hits.append(now)
-    _push_rate[satellite_id] = hits
-    return True
-
-
-@router.get("/satellite/status")
-async def satellite_status():
-    enabled, reason = _satellite_auth.registration_state()
-    return {
-        "enabled": enabled,
-        "reason": reason,
-        "routes": list(_satellite_auth.TOKEN_ROUTES),
-    }
-
-
-@router.post("/satellite/pair-codes")
-async def create_satellite_pair_code(request: Request):
-    if _oversize_header(request, _MAX_BODY):
-        return JSONResponse({"error": "request body too large"}, status_code=400)
-    raw = await request.body()
-    if len(raw) > _MAX_BODY:
-        return JSONResponse({"error": "request body too large"}, status_code=400)
-    try:
-        body = json.loads(raw or b"{}")
-    except (ValueError, UnicodeDecodeError):
-        return JSONResponse({"error": "invalid JSON"}, status_code=400)
-    if not isinstance(body, dict):
-        return JSONResponse({"error": "body must be an object"}, status_code=400)
-    name = body.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return JSONResponse({"error": "name required"}, status_code=400)
-    agent_name = body.get("agent_name")
-    if agent_name is not None and not isinstance(agent_name, str):
-        return JSONResponse({"error": "agent_name must be a string"}, status_code=400)
-    connections = body.get("connections")
-    if connections is not None and not isinstance(connections, list):
-        return JSONResponse({"error": "connections must be a list"}, status_code=400)
-    desktop_profile = body.get("desktop_profile")
-    if desktop_profile is not None and not isinstance(desktop_profile, str):
-        return JSONResponse(
-            {"error": "desktop_profile must be a string"}, status_code=400
-        )
-
-    def _create():
-        config = _config.load_config(_data_dir())
-        collect_cfg = _collect.Config.from_dict(config.get("collect") or {})
-        return _satellite_hub.create_pair_code(
-            _db_path(),
-            name.strip(),
-            (agent_name or "").strip(),
-            connections if isinstance(connections, list) else None,
-            desktop_profile.strip() if isinstance(desktop_profile, str) else None,
-            hermes_home=collect_cfg.hermes_home,
-        )
-
-    try:
-        code, expires_at = await asyncio.to_thread(_create)
-    except ValueError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    return {"code": code, "expires_at": expires_at}
-
-
-@router.get("/satellites")
-async def list_satellites_route():
-    def _load():
-        return _satellite_hub.list_satellites(_db_path())
-
-    return {"satellites": await asyncio.to_thread(_load)}
-
-
-@router.delete("/satellites/{satellite_id}")
-async def revoke_satellite(satellite_id: str):
-    if not _SESSION_ID_RE.match(satellite_id):
-        return JSONResponse({"error": "invalid satellite id"}, status_code=400)
-
-    def _revoke():
-        _satellite_hub.revoke(_db_path(), satellite_id)
-
-    try:
-        await asyncio.to_thread(_revoke)
-    except ValueError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=404)
-    return {"ok": True}
-
-
-@router.post("/satellite/pair")
-async def satellite_pair(request: Request):
-    code_id, err = _require_pair_principal(request)
-    if err is not None:
-        return err
-    if _oversize_header(request, _MAX_BODY):
-        return JSONResponse({"error": "request body too large"}, status_code=400)
-    raw = await request.body()
-    if len(raw) > _MAX_BODY:
-        return JSONResponse({"error": "request body too large"}, status_code=400)
-    try:
-        body = json.loads(raw or b"{}")
-    except (ValueError, UnicodeDecodeError):
-        return JSONResponse({"error": "invalid JSON"}, status_code=400)
-    if not isinstance(body, dict):
-        return JSONResponse({"error": "body must be an object"}, status_code=400)
-    hostname = body.get("hostname", "")
-    version = body.get("version", "")
-    if not isinstance(hostname, str) or not isinstance(version, str):
-        return JSONResponse({"error": "hostname and version required"}, status_code=400)
-
-    bearer = request.headers.get("authorization") or ""
-    token = bearer[7:].strip() if bearer.lower().startswith("bearer ") else ""
-
-    def _redeem():
-        config = _config.load_config(_data_dir())
-        collect_cfg = _collect.Config.from_dict(config.get("collect") or {})
-        if _satellite_hub.verify_pair_code(_db_path(), token) != code_id:
-            return None
-        return _satellite_hub.redeem_pair_code(
-            _db_path(),
-            token,
-            hostname[:200],
-            version[:200],
-            hermes_home=collect_cfg.hermes_home,
-        )
-
-    try:
-        result = await asyncio.to_thread(_redeem)
-    except ValueError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=409)
-    if result is None:
-        return JSONResponse({"error": "invalid or expired code"}, status_code=401)
-    satellite_id, sat_token, sat_name, agent_name = result
-    return {
-        "satellite_id": satellite_id,
-        "token": sat_token,
-        "name": sat_name,
-        "agent_name": agent_name,
-    }
-
-
-@router.post("/satellite/push")
-async def satellite_push(request: Request):
-    _maybe_start_background()
-    satellite_id, err = _require_sat_principal(request)
-    if err is not None:
-        return err
-    if _oversize_header(request, _MAX_PUSH_BODY):
-        return JSONResponse({"error": "request body too large"}, status_code=413)
-    raw = await request.body()
-    if len(raw) > _MAX_PUSH_BODY:
-        return JSONResponse({"error": "request body too large"}, status_code=413)
-    now = time.time()
-    if not _push_rate_ok(satellite_id, now):
-        return JSONResponse({"error": "rate limited"}, status_code=429)
-    try:
-        body = json.loads(raw or b"{}")
-    except (ValueError, UnicodeDecodeError):
-        return JSONResponse({"error": "invalid JSON"}, status_code=400)
-    if not isinstance(body, dict):
-        return JSONResponse({"error": "body must be an object"}, status_code=400)
-
-    def _ingest():
-        return _satellite_hub.ingest(_db_path(), satellite_id, body, now=now)
-
-    try:
-        result = await asyncio.to_thread(_ingest)
-    except ValueError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    return result
 
 
 @router.get("/quiz")

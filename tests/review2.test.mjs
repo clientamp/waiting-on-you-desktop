@@ -16,7 +16,6 @@ test('expired tasks have a distinct history label and never look completed', asy
   assert.equal(model.isHistoryTask({status: 'done'}), true)
   assert.equal(strings.statusExpired, 'Cleared for age · not answered')
   assert.match(strings.closedNote, /[Aa]ge-cleared tasks can return/)
-  assert.match(strings.satellitesHttpPublicWarning, /hostnames/)
   assert.match(strings.settingsRetentionHint, /Forever.*default/)
   assert.match(strings.scanDone(0, 0, 1), /1 cleared for age/)
   const panel = await readFile('src/ui/TasksPanel.tsx', 'utf8')
@@ -26,10 +25,8 @@ test('expired tasks have a distinct history label and never look completed', asy
   assert.match(row, /task\.status === 'expired'.*strings\.statusExpired/s)
 })
 
-test('README retention and plain HTTP rules match the product defaults', async () => {
+test('README retention rules match the product defaults', async () => {
   const readme = await readFile('README.md', 'utf8')
   assert.match(readme, /Keep unanswered tasks \(days\) \| 0 \(Forever\)/)
   assert.match(readme, /[Ee]xpiry is opt-in/)
-  assert.doesNotMatch(readme, /Plain `http`[^\n]*`\.local`[^\n]*localhost/)
-  assert.match(readme, /[Hh]ostnames, including `\.local`, require HTTPS/)
 })

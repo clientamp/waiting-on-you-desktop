@@ -17,14 +17,15 @@ Please report security issues privately to **support@clientamp.com**. Do not ope
 
 ## What leaves your machine
 
-- **Models and paired hub:** see the complete [outbound paths in README](README.md#privacy--what-is-sent-where), including classification, AI naming, tag suggestions, priority evaluation, optional decision providers, and satellite push. There is no telemetry. Plain HTTP satellite traffic exposes the token and chat excerpts unencrypted on the LAN; prefer Tailscale Serve with HTTPS or another HTTPS endpoint.
-- **SSH** to hosts you configured, only for read-only collection as above.
+- **Models:** see the complete [outbound paths in README](README.md#privacy--what-is-sent-where), including classification, AI naming, tag suggestions, priority evaluation, and optional decision providers. There is no telemetry.
+- **SSH** to hosts you configured, only for read-only collection as above. Off unless you list hosts.
 
 ## What does not happen
 
-- No modification of Hermes chat message bodies except the optional archive flag you control.
-- No network calls beyond the configured model/decision providers, paired satellite hub, and optional SSH targets you define.
+- No edits to existing Hermes chat messages. The plugin adds to a chat only when you answer from the panel (Yes, No or Reply): after the undo window, that answer is sent as a new message through the composer of the chat this window is showing. The optional archive flag is the only other change it makes to your chats.
+- No network calls beyond the configured model/decision providers and optional SSH targets you define.
+- No satellite pairing or push endpoints. Earlier satellite records in the task database are left in place and ignored.
 
 ## Dashboard route protection
 
-Plugin routes rely on the Hermes dashboard’s authentication and CSRF protection. Do not expose a dashboard with authentication disabled. Satellite pairing/push additionally require scoped bearer credentials; they do not grant general dashboard access.
+Plugin routes rely on the Hermes dashboard’s authentication and CSRF protection. Do not expose a dashboard with authentication disabled. The plugin registers no bearer-token routes of its own.

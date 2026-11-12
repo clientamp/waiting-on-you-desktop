@@ -29,7 +29,6 @@ import { Switch } from './Switch'
 import { strings } from './strings'
 import { notifyError } from './notify'
 import { SETTINGS_SHORTCUT_ROWS, comboToKeyCaps } from './shortcuts'
-import { SatellitesSection } from './SatellitesSection'
 import { DecisionModelControls } from './DecisionModelControls'
 import { SuggestTagsPanel } from './SuggestTagsPanel'
 import { PRIORITIES_NOTE_MAX, charCounter } from './priorityHelpers'
@@ -555,8 +554,6 @@ export function SettingsView({
           />
           <SuggestTagsPanel ctx={ctx} tags={tags} onAddTag={onAddSuggestedTag} />
         </section>
-
-        <SatellitesSection ctx={ctx} />
 
         <section className="wou-settings-card" aria-labelledby="wou-set-shortcuts">
           <h3 id="wou-set-shortcuts">{strings.settingsShortcutsSection}</h3>

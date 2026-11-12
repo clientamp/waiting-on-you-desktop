@@ -12,13 +12,21 @@ Checked 2026-11-09 against Hermes source in the local install (`hermes_cli/plugi
 - **Existing data detection** uses verified WoU markers (`wou.db` with a `tasks` table, `config.json` / `settings.json` with WoU keys), not bare `settings.json` in `plugin-data/<catalog_id>` — another plugin can own that path.
 - **Manifest decision settings migration** has no public Hermes loader for “read legacy catalog entry when ctx is missing”; runtime code uses `ctx.get_config` first, then `HERMES_HOME/config.yaml` `plugins.entries` (current catalog id before legacy). See `wou.plugin_config.settings_migration_blocker()`. WoU does not call private `hermes_cli.config` loaders.
 - **Desktop `ctx.storage` UI prefs** are namespaced per plugin id with no public cross-id read API (`desktop-plugin-sdk.md` — convention, not isolation). Panel filter/collapse keys do not auto-migrate from `waiting-on-you` to `waiting-on-you-desktop`; task data and `settings.json` do.
-- **Satellite push/pair** uses `/api/plugins/waiting-on-you-desktop/satellite/*` with HTTP 404 fallback to the legacy prefix; bearer token routes register both prefixes (`wou.satellite_auth.TOKEN_ROUTES`).
 - **Scanner ownership** when old and new catalog packages share one data tree: `background.lock` and `scan.lock` under `plugin-data/waiting-on-you` keep a single owner (existing `BackgroundRunner` behavior).
-- **Validate warnings retained (read-only):** Hermes `plugins validate` still warns on two couplings; silencing the linter is out of scope until the public APIs below exist.
 
-  **Private token-route imports (`wou/satellite_auth.py`):** `register_token_route` / `is_token_route` and `_token_routes` enumeration live in `hermes_cli.dashboard_auth.token_auth`, which is **not** listed in `hermes_cli/data/plugin_api.json` (only `hermes_cli.dashboard_auth` is public for `DashboardAuthProvider`, `register_provider`, `TokenPrincipal`, etc.). There is **no documented public** “register this plugin REST path for bearer token auth” hook on `PluginContext` yet (dashboard docs cover `register_dashboard_auth_provider()` for OIDC/session providers, not per-route token allowlists). **Scoped work to clear the warning:** (1) Hermes ships a supported export such as `from hermes_cli.dashboard_auth import register_token_route` (or a `ctx.register_token_authenticated_route(path)` on dashboard plugin load); (2) switch WoU to that surface and drop `token_auth._lock` / `_token_routes` introspection or replace it with a public “list registered token routes” API; (3) keep fail-closed drain-route checks in tests.
+## Satellite pairing waits for public token routes
 
-  **Raw Desktop bridge (`src/ui/openChat.ts` `openSessionWindow`):** `plugin_validate_desktop.py` warns on any `globalThis.hermesDesktop` touch (catalog rule 8). **Public replacements today:** user-visible messages go through `host.notify` from `@hermes/plugin-sdk` (`src/ui/notify.ts`; optional `hermesDesktop.logLine` removed). In-window navigation uses `host.openSession` / `host.navigate` (see Hermes `apps/desktop/src/sdk/index.ts`, already used in `openChat.ts` for main-pane opens). Open / new-window behavior is unchanged. **Still missing from the published SDK:** `host.openSessionWindow` (or equivalent) for cross-profile “open in new window”. **Scoped work:** extend `sdk.d.ts` + stubs when Desktop exports `openSessionWindow` on `host`; rebuild `desktop/plugin.js` so validate no longer sees `hermesDesktop` in the shipping bundle except any deliberately retained escape hatches documented here.
+Satellite pairing and push are not shipped. Pushing chats from another Hermes needs plugin REST routes that accept a scoped bearer token instead of a dashboard session. Hermes has no supported public API for that yet; the only way today is a private dashboard-auth module, which a catalog plugin must not import.
+
+Pairing can return only after Hermes ships supported public plugin token routes. Tracking: [hermes-agent#151760](https://github.com/NousResearch/hermes-agent/pull/151760) (open, not merged) and [hermes-agent#143507](https://github.com/NousResearch/hermes-agent/issues/143507).
+
+What you get instead: optional read-only SSH collection through `collect.remote_hosts`, off by default. Satellite tables and rows from earlier versions stay in `wou.db` untouched and are ignored; no migration deletes them.
+
+Do not register token-authenticated routes through private Hermes modules.
+
+## Opening another agent's chat
+
+Chat links call the public SDK `host.openSession(sessionId, { intent: 'window', profile, route })`. Waiting On You does not use a private Desktop bridge. If the host cannot open a separate window, the SDK may open the chat in a tab instead. On a host without `host.openSession`, the link navigates to the chat in place.
 
 ## `wou_list` cannot expand beyond the trusted invocation profile
 

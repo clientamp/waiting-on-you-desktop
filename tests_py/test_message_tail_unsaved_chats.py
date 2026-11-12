@@ -15,12 +15,7 @@ from wou.collect import Config, clip, collect_db
 
 @pytest.mark.parametrize('role,field,limit', [('assistant', 'agent_last', 900), ('user', 'user_last', 300)])
 @pytest.mark.parametrize('separator', [' ', ' \t\n  '])
-@pytest.mark.parametrize('reader', ['local', 'satellite'])
-def test_sql_excerpt_preserves_final_sentence(tmp_path, role, field, limit, separator, reader):
-    if reader == 'satellite':
-        from satellite.wou_satellite.reader import collect_db as read_db
-    else:
-        read_db = collect_db
+def test_sql_excerpt_preserves_final_sentence(tmp_path, role, field, limit, separator):
     db = tmp_path / 'state.db'
     make_state_db(db)
     add_session(db, 'session', started_at=100)
@@ -28,7 +23,7 @@ def test_sql_excerpt_preserves_final_sentence(tmp_path, role, field, limit, sepa
     content = separator.join(['Earlier detailed progress'] * 200) + separator + final
     assert len(content) > 3000
     add_message(db, 'message', 'session', role, content)
-    row, = read_db(db, Config(), now=100)
+    row, = collect_db(db, Config(), now=100)
     assert final in row[field]
     assert row[field] == clip(content, limit)
     assert len(row[field]) <= limit + 1
@@ -36,12 +31,7 @@ def test_sql_excerpt_preserves_final_sentence(tmp_path, role, field, limit, sepa
 
 @pytest.mark.parametrize('role,field', [('assistant', 'agent_last'), ('user', 'user_last')])
 @pytest.mark.parametrize('trailing', ['\n' * 6256, ' \t\r\n\v\f' * 1100], ids=['newlines', 'mixed-whitespace'])
-@pytest.mark.parametrize('reader', ['local', 'satellite'])
-def test_sql_excerpt_ignores_trailing_whitespace(tmp_path, role, field, trailing, reader):
-    if reader == 'satellite':
-        from satellite.wou_satellite.reader import collect_db as read_db
-    else:
-        read_db = collect_db
+def test_sql_excerpt_ignores_trailing_whitespace(tmp_path, role, field, trailing):
     db = tmp_path / 'state.db'
     make_state_db(db)
     add_session(db, 'session', started_at=100)
@@ -49,7 +39,7 @@ def test_sql_excerpt_ignores_trailing_whitespace(tmp_path, role, field, trailing
     content = ask + trailing
     add_message(db, 'message', 'session', role, content)
 
-    rows = read_db(db, Config(tail_chars=1500, user_chars=1500), now=100)
+    rows = collect_db(db, Config(tail_chars=1500, user_chars=1500), now=100)
 
     # The non-empty filter must retain the message, not just its session.
     assert len(rows) == 1

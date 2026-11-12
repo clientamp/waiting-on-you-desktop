@@ -84,13 +84,13 @@ test('sessionConnectionIdForApi', async () => {
 
 test('remote session requests carry a plain id, not a prefixed chat key', async () => {
   const { sessionPostBody, sessionQueryParams } = await loadModel()
-  const owner = { connectionId: 'satellite-connection', profile: 'default' }
+  const owner = { connectionId: 'remote-connection', profile: 'default' }
   const body = sessionPostBody('session-1', 'default', owner, 'hub', { quadrant: 2 })
   const params = sessionQueryParams('session-1', 'default', owner, 'hub')
   assert.equal(body.session_id, 'session-1')
   assert.equal(params.session_id, 'session-1')
-  assert.equal(body.connection_id, 'satellite-connection')
-  assert.equal(params.connection_id, 'satellite-connection')
+  assert.equal(body.connection_id, 'remote-connection')
+  assert.equal(params.connection_id, 'remote-connection')
   assert.equal(body.session_id.includes(':'), false)
 })
 

@@ -80,19 +80,9 @@ def test_readonly_sqlite_uri_escapes_filename(tmp_path):
     assert len(collect_db(path, Config(), now=101)) == 1
 
 @pytest.mark.parametrize('field,limit', [('profile',64),('cwd',1024)])
-def test_satellite_metadata_is_bounded(field, limit):
-    from wou.satellite_hub import _validate_chat_row
+def test_chat_metadata_is_bounded(field, limit):
+    from wou.chat_rows import _validate_chat_row
     row = dict(id='c', source='desktop', title='T', last_active=1, last_msg_id='m', last_role='assistant', user_last='', agent_last='Ask')
     row[field] = 'x' * (limit + 1)
     with pytest.raises(ValueError):
         _validate_chat_row(row, 0)
-
-def test_satellite_project_catalog_is_bounded(tmp_path):
-    from wou.satellite_hub import create_pair_code, redeem_pair_code, ingest
-    home = tmp_path / 'hermes'
-    home.mkdir()
-    db = str(tmp_path / 'wou.db')
-    code, _ = create_pair_code(db, 'host', 'Agent', [], None, hermes_home=home, now=100)
-    sid, *_ = redeem_pair_code(db, code, 'host', '1', hermes_home=home, now=100)
-    with pytest.raises(ValueError, match='catalog'):
-        ingest(db, sid, {'chats': [], 'full': True, 'version': '1', 'projects': [None] * 2001})

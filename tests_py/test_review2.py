@@ -68,38 +68,6 @@ def test_snooze_survives_retention_and_wake_scan(tmp_path, monkeypatch, until, e
     store.close()
 
 
-def test_upgrade_duplicate_satellite_names_preserves_chats(tmp_path):
-    from wou.satellite_hub import ensure_tables
-    db = str(tmp_path / 'sat.db')
-    ensure_tables(db)
-    with sqlite3.connect(db) as conn:
-        conn.execute('DROP INDEX IF EXISTS idx_satellites_active_name')
-        for i, name in enumerate(['desk', 'DESK', 'desk (2)', 'Desk']):
-            conn.execute('INSERT INTO satellites(id,name,agent_name,connections,token_hash,created_at) VALUES(?,?,?,?,?,?)',
-                         (str(i), name, 'A', '[]', str(i), i))
-            conn.execute('INSERT INTO satellite_chats VALUES(?,?,?,?)', (str(i), 'c', '{"keep":true}', 1))
-    store = Store(db)
-    task_ids = [store.upsert_task(f'desk:c{i}', 'A', 'Chat', f'Ask {i}?', str(i), 2, 'm') for i in range(4)]
-    tasks_before = []
-    for tid in task_ids:
-        assert tid is not None
-        tasks_before.append(store.get_task(tid))
-    store.close()
-    ensure_tables(db)
-    ensure_tables(db)
-    store = Store(db)
-    tasks_after = []
-    for tid in task_ids:
-        assert tid is not None
-        tasks_after.append(store.get_task(tid))
-    assert tasks_after == tasks_before
-    store.close()
-    with sqlite3.connect(db) as conn:
-        rows = conn.execute('SELECT name,revoked_at FROM satellites ORDER BY created_at').fetchall()
-        assert rows == [('desk', None), ('DESK', None), ('desk (2)', None), ('Desk', None)]
-        assert conn.execute('SELECT COUNT(*) FROM satellite_chats').fetchone()[0] == 4
-        assert conn.execute("SELECT name FROM sqlite_master WHERE name='idx_satellites_active_name'").fetchall() == []
-
 
 @pytest.mark.parametrize('profiles,owner', [
     ([{'name': 'work', 'state_db': 'custom'}], 'work'),

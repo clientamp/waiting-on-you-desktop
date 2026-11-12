@@ -104,52 +104,7 @@ export const strings = {
   firstRunChangeSettings: 'Change settings first',
   settingsBack: '‹ Back',
   settingsTaskTitlesSection: 'Task titles & chats',
-  settingsSatellitesSection: 'Other machines',
-  satellitesIntro:
-    'Install Waiting On You Satellite on each other Hermes so its chats show up here.',
-  satellitesDisabled: (reason: string) =>
-    `Satellites can't connect to this Hermes right now: ${reason}. Chats from other machines still come in over SSH if you set that up.`,
-  satellitesEmpty: 'No other machines yet.',
-  satellitesAdd: 'Add a machine',
-  satellitesName: 'Name',
-  satellitesNameHint:
-    'Short id, e.g. studio. One per Hermes (each profile on a Mac needs its own). Moving a machine off SSH? Use the same name so its tasks carry over.',
-  satellitesAgentName: 'Agent name',
-  satellitesAgentHint: 'e.g. "Juno"',
-  satellitesConnection: 'Desktop connection name',
-  satellitesConnectionHint: 'So clicking a task opens the chat on that machine',
-  satellitesHubAddress: 'Hub address',
-  satellitesHubAddressHint:
-    "This Hermes dashboard's address as the other machine sees it (the dashboard port, 9119 by default). Examples: https://hub.example.ts.net (Tailscale Serve) or http://192.168.1.10:9119 (LAN private IP). HTTP requires localhost or a literal private, loopback, or CGNAT IP; hostnames require HTTPS. Plain HTTP sends the satellite token and chat excerpts unencrypted. Prefer HTTPS.",
-  satellitesHttpPublicWarning:
-    'The satellite refuses plain HTTP to public IP addresses or hostnames, including .local. Use HTTPS.',
-  satellitesCreateCode: 'Create pairing code',
-  satellitesCancel: 'Cancel',
-  satellitesCopyCommand: 'Copy command',
-  satellitesCodeExpiry: 'Code works once and expires in 10 minutes',
-  satellitesPairStep1:
-    'Copy the satellite folder to ~/.hermes/plugins/waiting-on-you-satellite on that machine.',
-  satellitesPairStep2: 'Run hermes plugins enable waiting-on-you-satellite',
-  satellitesPairStep3: 'Run the command above on that machine.',
-  satellitesPairStep4:
-    "Restart that machine's Hermes gateway. Check it with hermes waiting-on-you-satellite status.",
-  satellitesRemove: 'Remove',
-  satellitesRemoveConfirm: (agent: string) =>
-    `Remove ${agent}? It will stop sending chats until you pair it again.`,
-  satellitesNameInvalid:
-    'Use lowercase letters, numbers, hyphens, or underscores (max 32 characters).',
-  satellitesHubRequired: 'Enter the hub address other machines should use.',
-  satellitesPairErrorGeneric: 'Could not create a pairing code. Try again.',
-  satellitesPairErrorName: 'That name is not allowed or is already in use.',
-  satellitesPairErrorTooMany: 'Too many active pairing codes. Wait or remove an old machine.',
-  satellitesRevokeError: 'Could not remove this machine. Try again.',
-  satellitesLoadError: 'Could not load other machines.',
-  satellitesStatusWaiting: 'Waiting for first update',
-  satellitesStatusSending: (updated: string) => `Sending tasks · updated ${updated}`,
-  satellitesStatusUpdatedJustNow: 'just now',
-  satellitesStatusUpdatedMin: (n: number) => `${n} min ago`,
-  satellitesStatusLastHours: (n: number) => `Last update ${n} h ago`,
-  satellitesStatusLastDays: (n: number) => `Last update ${n} days ago`,
+
   settingsFrequencySection: 'How often it checks',
   settingsUsageSection: 'Usage',
   settingsAdvanced: 'Advanced',

@@ -283,53 +283,6 @@ export async function triggerScan(
   return ctx.rest<ScanSummary>('/scan', { method: 'POST', body, timeoutMs: 180_000 })
 }
 
-export interface SatelliteStatus {
-  enabled: boolean
-  reason: string
-  routes: string[]
-}
-
-export interface Satellite {
-  id: string
-  name: string
-  agent_name: string
-  connections: string[]
-  desktop_profile: string | null
-  created_at: number
-  last_seen: number | null
-  last_push_count: number | null
-  revoked_at: number | null
-}
-
-export interface PairCodeResult {
-  code: string
-  expires_at: number
-}
-
-export async function fetchSatelliteStatus(ctx: PluginContext): Promise<SatelliteStatus> {
-  return ctx.rest<SatelliteStatus>('/satellite/status')
-}
-
-export async function fetchSatellites(ctx: PluginContext): Promise<Satellite[]> {
-  const res = await ctx.rest<{ satellites: Satellite[] }>('/satellites')
-  return res.satellites
-}
-
-export async function createPairCode(
-  ctx: PluginContext,
-  body: {
-    name: string
-    agent_name?: string
-    connections?: string[]
-    desktop_profile?: string
-  },
-): Promise<PairCodeResult> {
-  return ctx.rest<PairCodeResult>('/satellite/pair-codes', { method: 'POST', body })
-}
-
-export async function revokeSatellite(ctx: PluginContext, id: string): Promise<void> {
-  await ctx.rest<{ ok: boolean }>(`/satellites/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
 
 // ---- Teach priorities ----
 

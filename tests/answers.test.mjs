@@ -276,13 +276,13 @@ test('canAnswerInPanel: only open chats that open in this window, on hosts that 
   }
   assert.equal(m.canAnswerInPanel(otherProfile, true), false)
   assert.equal(m.unsupportedAnswerReason(otherProfile), 'other-window')
-  const satellite = {
+  const remote = {
     chat_key: 'studio:abc',
     chat_target: { session_id: 'abc', profile: null, connection: 'conn-studio' },
     status: 'open',
   }
-  assert.equal(m.canAnswerInPanel(satellite, true), false)
-  assert.equal(m.unsupportedAnswerReason(satellite), 'other-window')
+  assert.equal(m.canAnswerInPanel(remote, true), false)
+  assert.equal(m.unsupportedAnswerReason(remote), 'other-window')
   const mail = { chat_key: 'mailhist:client_questions:4', chat_target: null, status: 'open' }
   assert.equal(m.canAnswerInPanel(mail, true), false)
   assert.equal(m.unsupportedAnswerReason(mail), null)

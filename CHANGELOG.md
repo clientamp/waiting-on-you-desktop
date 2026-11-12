@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 — 2026-11-12
+
+- Removed satellite pairing: no pairing, push or token routes ship, and Settings no longer has an Other machines section. Pairing can return once Hermes supports token-authenticated plugin routes through a public API ([hermes-agent#151760](https://github.com/NousResearch/hermes-agent/pull/151760), [hermes-agent#143507](https://github.com/NousResearch/hermes-agent/issues/143507))
+- No destructive database migration: satellite tables and rows from earlier versions stay in `wou.db` untouched and are ignored
+- Read-only SSH collection (`collect.remote_hosts`) still works and stays off until you add a host
+- Chat links open other agents' chats through the public SDK `host.openSession` with `intent: 'window'`, the chat's profile and route. No private Desktop bridge is used. Hosts without window support may open a tab; hosts without `host.openSession` navigate in place
+- Still requires Hermes 0.21.5 or newer
+
 ## 1.0.1 — 2026-11-11
 
 - Calmer task cards: the selected task gets a soft tint instead of a blue left bar, so nothing cuts through a sub-item's checkbox, and the tint keeps clear of neighbouring asks
@@ -27,7 +35,6 @@
 
 - Keep unanswered tasks forever by default (`retention_days: 0`); opt-in expiry is labeled “Cleared for age · not answered” in history, never counted as answered
 - Future snoozes survive retention; waking starts a fresh retention window
-- Safely reconcile duplicate satellite names during upgrade without deleting chats or revoking machines
 - Archive and Undo use the owning profile's configured database; unknown or ambiguous owners fail closed
 - Group close skips already-terminal members, closes remaining tasks atomically, and returns only changed ids for Undo
 - Background ownership retries after reload while an old scan finishes, with cancellable retries and a single runner
@@ -36,19 +43,18 @@
 - Hermes Projects on tasks and groups; project badges and group-by-project
 - Colored tags and tag suggestions, flexible grouping, priorities with context and due dates, and a short quiz to teach the plugin what matters to you
 - Optional decision models for scan gating, priority scoring, and automatic tagging
-- Privacy-first consent gate, clearer outbound-path disclosures, and safer satellite HTTP rules
+- Privacy-first consent gate and clearer outbound-path disclosures
 - Task list durability: separate scan lookback from retention, explicit group closes, snooze-safe rescans, and honest scan failure reporting
-- Settings and schema hardening: atomic saves, full migration locking, background scan on hub idle, and pairing redemption fixes
+- Settings and schema hardening: atomic saves, full migration locking, and background scan when idle
 
 ### Hardening
 
-- Limit stored satellite chats to the newest 2,000 per machine; reject invalid activity dates and oversized project profiles, and prevent names colliding with SSH hosts.
+- Reject invalid activity dates and oversized project profiles.
 - Give each classifier call fresh random data markers; disclose priority examples shared from other chats.
 - Separate SSH options from host names, bound remote output and project lists, and drop invalid chat rows before caching or scanning.
 - Require plain session ids and existing local chats for manual tasks; validate card action inputs before executing configured handlers.
 - Keep forced scans below twice the daily limit (zero remains unlimited), and reject overlapping tag suggestions or priority evaluations with a short notice.
-- Clip message text inside database reads, including the satellite reader.
-- Disable satellite tokens when any unrelated token route is registered.
+- Clip message text inside database reads.
 - Stop a scan after three matching connection failures and explain how to restore model access; failed chats stay available for retry.
 
 ## Unreleased
@@ -58,14 +64,9 @@
 - Cached chats from an unreachable SSH host are never re-sent to the model
 - Prompt: only the 10 most recent closed asks per chat, and project ids dropped
 - `wou_list` tool returns a slim list (about a tenth of the tokens): 20 tasks by default, most important first, plus the total count
-- Fix: SSH collection and the satellite reader crashed with an import error (`attempted relative import`) when run outside the plugin package
+- Fix: SSH collection crashed with an import error (`attempted relative import`) when run outside the plugin package
 - Panel warns when another machine can't be reached and its chats are stale
-- Satellite starts sending as soon as its gateway loads, not on the first new chat turn
-- README: one recommended setup for other machines (satellite), how to find the hub address, one satellite per Hermes home, keep the same name when moving off SSH, status and troubleshooting
 - Checking a task off from another profile's chat no longer 404s. The pane follows the focused chat, so Desktop asks that profile for the plugin. A profile that has the root install enabled now reads and writes the default home's task list instead of an empty one.
-- Settings: Other machines section to pair and manage Waiting On You satellites
-- Satellite plugin (`waiting-on-you-satellite`): pair via CLI, push changed chats to the hub, URL safety for plain HTTP
-- Hub satellite pairing: short-lived codes, bearer-token push ingest, revoke, and collect merge (SSH fallback when names differ)
 - Clicking the gear while Settings is open now closes Settings
 - Show or hide the panel: status bar button, header button, ⌘⌥Y (was open-only), and a ⌘K command; the choice persists
 - Desktop pane: recover from backend restarts — DOM-aware pane visibility for polling, resilient settings/projects/tasks load with backoff, and settings UI while the bundle is still loading

@@ -700,42 +700,7 @@ class StandaloneReaderTestCase(unittest.TestCase):
         data = json.loads(proc.stdout)
         self.assertEqual([row["id"] for row in data], ["seeded"])
 
-    def test_satellite_reader_imports_without_wou(self):
-        repo = Path(__file__).resolve().parents[1]
-        satellite = repo / "satellite"
-        script = """
-import sys
-satellite = sys.argv[1]
-kept = []
-for entry in sys.path:
-    if not entry:
-        continue
-    if "site-packages" in entry or "waiting-on-you" in entry:
-        continue
-    kept.append(entry)
-sys.path = [satellite] + kept
-try:
-    import wou.paths
-except ImportError:
-    pass
-else:
-    raise SystemExit("wou.paths should not be importable")
-from wou_satellite.reader import Config
-cfg = Config.from_dict({"days": 10, "local_profiles": []})
-assert cfg.days == 10
-assert cfg.local_profiles == []
-"""
-        env = os.environ.copy()
-        env.pop("PYTHONPATH", None)
-        proc = subprocess.run(
-            [sys.executable, "-c", script, str(satellite)],
-            cwd=str(satellite),
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+
 
 
 if __name__ == "__main__":

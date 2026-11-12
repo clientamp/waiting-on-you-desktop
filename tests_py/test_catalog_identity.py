@@ -232,67 +232,13 @@ def test_concurrent_catalog_packages_share_scan_lock(tmp_path):
         bg_a.release()
 
 
-def test_satellite_token_routes_include_legacy_prefixes():
-    from wou import identity as id_mod
-    from wou.satellite_auth import TOKEN_ROUTES
-
-    assert id_mod.CATALOG_SATELLITE_PAIR in TOKEN_ROUTES
-    assert id_mod.LEGACY_SATELLITE_PAIR in TOKEN_ROUTES
-    assert id_mod.CATALOG_SATELLITE_PUSH in TOKEN_ROUTES
-    assert id_mod.LEGACY_SATELLITE_PUSH in TOKEN_ROUTES
-
-
-def test_plugin_http_router_has_no_legacy_api_prefix(monkeypatch):
-    """Bearer token registration is not an HTTP mount; legacy prefix needs a separate host mount."""
-    from tests_py.test_satellite_api import _load_api_module
+def test_plugin_http_router_has_no_legacy_api_prefix():
+    """The catalog router exposes neither legacy API mounts nor satellite routes."""
+    from tests_py.test_api import _load_api_module
 
     api = _load_api_module()
     paths = {getattr(route, "path", "") for route in api.router.routes}
-    assert "/satellite/pair" in paths
-    assert "/satellite/push" in paths
+    assert not any("satellite" in path for path in paths)
     assert not any(
         str(path).startswith(identity.LEGACY_API_PREFIX) for path in paths if path
     )
-
-
-def test_satellite_sender_uses_catalog_paths_first():
-    from satellite.wou_satellite import sender
-
-    assert sender.PAIR_PATH.startswith(identity.CATALOG_API_PREFIX)
-    assert sender.PUSH_PATH.startswith(identity.CATALOG_API_PREFIX)
-
-
-def test_satellite_legacy_fallback_only_on_404(monkeypatch):
-    from satellite.wou_satellite import sender
-
-    calls: list[str] = []
-
-    def fake_json(method, url, token, body=None):
-        calls.append(url)
-        if url.endswith(sender.PUSH_PATH):
-            return 404, None, None
-        if url.endswith(sender.LEGACY_PUSH_PATH):
-            return 200, {"accepted": 1}, None
-        return 503, None, None
-
-    monkeypatch.setattr(sender, "_json_request", fake_json)
-    status, parsed, err = sender._post_json_with_legacy(
-        "http://hub", sender.PUSH_PATH, sender.LEGACY_PUSH_PATH, "tok", {"chats": []}
-    )
-    assert status == 200
-    assert parsed == {"accepted": 1}
-    assert err is None
-    assert calls == ["http://hub" + sender.PUSH_PATH, "http://hub" + sender.LEGACY_PUSH_PATH]
-
-
-def test_satellite_does_not_fallback_on_non_404(monkeypatch):
-    from satellite.wou_satellite import sender
-
-    def fake_json(method, url, token, body=None):
-        return 401, {"error": "unauthorized"}, None
-
-    monkeypatch.setattr(sender, "_json_request", fake_json)
-    status, _, _ = sender._post_json_with_legacy(
-        "http://hub", sender.PUSH_PATH, sender.LEGACY_PUSH_PATH, "tok", {}
-    )
-    assert status == 401

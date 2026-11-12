@@ -1,4 +1,4 @@
-"""Shared validation for chat rows received from satellites and SSH readers."""
+"""Validation for chat rows received from SSH readers."""
 from __future__ import annotations
 
 import math

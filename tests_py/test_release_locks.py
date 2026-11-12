@@ -1,4 +1,4 @@
-"""Release-scope settings locks and satellite portability."""
+"""Release-scope settings locks and shared filelock portability."""
 
 from __future__ import annotations
 
@@ -82,23 +82,6 @@ class FilelockWindowsBranchTest(unittest.TestCase):
         return importlib.__import__(name, *args, **kwargs)
 
 
-class SatelliteRunnerImportTest(unittest.TestCase):
-    def test_runner_import_without_fcntl(self):
-        sat_root = Path(__file__).resolve().parents[1] / "satellite"
-        if str(sat_root) not in sys.path:
-            sys.path.insert(0, str(sat_root))
-        with mock.patch.dict(sys.modules, {"fcntl": None}):
-            with mock.patch("builtins.__import__", side_effect=self._import_without_fcntl):
-                if "wou_satellite.runner" in sys.modules:
-                    del sys.modules["wou_satellite.runner"]
-                runner = importlib.import_module("wou_satellite.runner")
-                self.assertTrue(callable(runner._try_push_lock))
-
-    def _import_without_fcntl(self, name, *args, **kwargs):
-        if name == "fcntl":
-            raise ImportError("no fcntl")
-        return importlib.__import__(name, *args, **kwargs)
-
 
 class LockSafetyRegressionTest(unittest.TestCase):
     def test_missing_lock_implementations_never_claim_success(self):
@@ -108,23 +91,7 @@ class LockSafetyRegressionTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 filelock.exclusive_lock(mock.Mock())
 
-    def test_satellite_windows_fd_locks_the_same_existing_byte(self):
-        sat_root = str(Path(__file__).resolve().parents[1] / 'satellite')
-        if sat_root not in sys.path:
-            sys.path.insert(0, sat_root)
-        from wou_satellite import filelock
-        calls = []
-        def locking(fd, mode, count):
-            calls.append(mode)
-            self.assertEqual(count, 1)
-            self.assertEqual(os.lseek(fd, 0, os.SEEK_CUR), 0)
-            self.assertGreaterEqual(os.fstat(fd).st_size, 1)
-        fake = mock.Mock(LK_NBLCK=1, LK_UNLCK=2, locking=locking)
-        with tempfile.TemporaryFile() as fh, mock.patch.dict(sys.modules, {'fcntl': None, 'msvcrt': fake}):
-            self.assertTrue(filelock.try_exclusive_lock_fd(fh.fileno()))
-            os.lseek(fh.fileno(), 5, os.SEEK_SET)
-            filelock.release_fd_lock(fh.fileno())
-        self.assertEqual(calls, [1, 2])
+
 
 
 if __name__ == "__main__":

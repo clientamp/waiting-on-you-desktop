@@ -1,8 +1,30 @@
 import sqlite3
+import time
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+
+def _make_state_db(path: Path, chat_id: str = "c1", msg_id: str = "m1") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            CREATE TABLE sessions (
+                id TEXT PRIMARY KEY, source TEXT, title TEXT, started_at REAL,
+                parent_session_id TEXT, archived INTEGER DEFAULT 0,
+                hidden INTEGER DEFAULT 0, last_activity_at REAL
+            );
+            CREATE TABLE messages (
+                id TEXT PRIMARY KEY, session_id TEXT, role TEXT, content TEXT,
+                active INTEGER DEFAULT 1
+            );
+        """)
+        now = time.time()
+        conn.execute("INSERT INTO sessions VALUES (?,?,?,?,?,?,?,?)",
+                     (chat_id, "desktop", "Title", now, None, 0, 0, now))
+        conn.execute("INSERT INTO messages VALUES (?,?,?,?,?)",
+                     (msg_id, chat_id, "user", "hello", 1))
 
 
 def projects_db(tmp_path):
@@ -51,8 +73,6 @@ def test_project_mapping(tmp_path):
 
 def test_multi_profile_collect(tmp_path):
     from wou.collect import Config, collect_all
-    from test_satellite_plugin import _make_state_db
-    import time
 
     for profile, folder in [
         ("default", tmp_path),
@@ -72,7 +92,6 @@ def test_multi_profile_collect(tmp_path):
 
 def test_standalone_ssh_reader_projects(tmp_path):
     from wou.collect import Config, run_remote
-    from test_satellite_plugin import _make_state_db
     from unittest.mock import patch
     import subprocess
 

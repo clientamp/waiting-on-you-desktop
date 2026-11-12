@@ -3,7 +3,6 @@ import {
   contextDraft,
   pickRoute,
   planOpen,
-  windowOptions,
   type ChatTarget,
   type ContextItem,
   type ProfileRoute,
@@ -26,19 +25,6 @@ interface HostExtras {
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-type SessionWindowOpener = (
-  sessionId: string,
-  opts: { profile: string; connectionId: string | null },
-) => Promise<{ ok: boolean; error?: string } | undefined>
-
-/** Desktop's own "Open in New Window" bridge (preload). Absent on web / old builds. */
-function sessionWindowOpener(): SessionWindowOpener | null {
-  const desktop = (globalThis as unknown as { hermesDesktop?: { openSessionWindow?: SessionWindowOpener } })
-    .hermesDesktop
-  const fn = desktop?.openSessionWindow
-  return typeof fn === 'function' ? fn.bind(desktop) : null
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -145,25 +131,15 @@ export async function openChat(
       route = pickRoute(routes, plan.profile, plan.connection, host.state.connectionId.get(), plan.aliases)
     }
 
-    // Another agent's chat: open it in its own window under that agent's
-    // profile, so this window stays on its own profile.
-    const openWindow = sessionWindowOpener()
-    if (openWindow) {
-      // Same-Hermes profiles (Bob) live on the connection this window uses,
-      // which is a remote one on a client Mac, not that Mac's own Hermes.
-      const winOpts = windowOptions(plan, route, host.state.connectionId.get())
-      const result = await openWindow(plan.sessionId, winOpts)
-      if (result && result.ok === false) throw new Error(result.error || 'the window did not open')
+    // Let the public SDK carry the owning profile/connection into a new window.
+    // Old hosts without this SDK door retain the plain in-place fallback.
+    if (typeof open !== 'function') {
+      host.navigate(`/${plan.sessionId}`)
       return
     }
-
-    if (typeof open !== 'function') throw new Error('this Desktop build cannot open other agents\u2019 chats')
-
     const opts: Record<string, unknown> = {
-      intent: 'in-place',
-      keepAllProfilesScope: true,
+      intent: 'window',
       profile: plan.profile,
-      forceResume: true,
     }
     if (route) opts.route = route
     await open(plan.sessionId, opts)

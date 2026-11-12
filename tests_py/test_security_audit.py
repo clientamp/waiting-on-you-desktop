@@ -1,5 +1,4 @@
-"""Audit contracts: documentation, public home resolver and fail-closed auth seam."""
-import importlib
+"""Audit contracts: privacy documentation and public home resolver."""
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,25 +13,13 @@ def test_default_home_uses_public_root_helper(tmp_path, monkeypatch):
     assert paths._default_hermes_home() == tmp_path
 
 
-def test_missing_token_route_api_disables_satellites(monkeypatch):
-    auth = importlib.import_module('wou.satellite_auth')
-    monkeypatch.setattr(auth, '_token_route_api', lambda: None)
-    monkeypatch.setattr(auth, '_provider_registered', False)
-    monkeypatch.setattr(auth, '_registration_reason', '')
-    assert auth.ensure_registered(lambda: 'unused.db') == (False, 'token_auth seam unavailable')
-    assert auth.WaitingOnYouSatelliteProvider(lambda: 'unused.db').verify_token(token='wousat_invalid') is None
-    assert auth.registration_state() == (False, 'token_auth seam unavailable')
-
-
-def test_privacy_discloses_all_outbound_paths_and_http_risk():
+def test_privacy_discloses_all_outbound_paths_and_csrf():
     readme = (ROOT / 'README.md').read_text()
-    for label in ('Classifier:', 'Rename with AI:', 'Suggest tags:', 'Priority evaluation:', 'Optional decision provider:', 'Satellite → hub:'):
+    for label in ('Classifier:', 'Rename with AI:', 'Suggest tags:', 'Priority evaluation:', 'Optional decision provider:'):
         assert label in readme
     for host in ('api.typesafe.ai', 'api.cloudflare.com', 'api.perplexity.ai', 'api.openai.com'):
         assert host in readme
     assert 'Nothing else from your machine is sent' not in readme
-    assert 'satellite token and chat excerpts unencrypted on the LAN' in readme
-    assert 'chat excerpts unencrypted' in (ROOT / 'src/ui/strings.ts').read_text()
     assert 'CSRF' in (ROOT / 'SECURITY.md').read_text()
 
 
