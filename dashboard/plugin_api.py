@@ -48,6 +48,7 @@ _settings = importlib.import_module("wou.settings")
 _hermes_sessions = importlib.import_module("wou.hermes_sessions")
 _collect = importlib.import_module("wou.collect")
 _config = importlib.import_module("wou.config")
+_child_env = importlib.import_module("wou.child_env")
 _usage = importlib.import_module("wou.usage")
 
 _ai_title = importlib.import_module("wou.ai_title")
@@ -633,6 +634,7 @@ async def run_task_action(task_id: int, action_id: str):
         try:
             proc = await asyncio.create_subprocess_exec(
                 *argv,
+                env=_child_env.child_env(passthrough=handler["env"]),
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

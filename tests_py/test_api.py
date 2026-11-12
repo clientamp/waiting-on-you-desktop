@@ -835,6 +835,51 @@ class DashboardApiTest(unittest.TestCase):
                     self.assertEqual(resp.status_code, expected)
                     spawn.assert_not_called()
 
+    def test_action_child_has_only_runtime_environment_by_default(self):
+        handler = Path(self.data_dir) / "check_env.py"
+        handler.write_text(
+            f"#!{sys.executable}\nimport json, os\n"
+            "checks = [bool(os.environ.get('PATH')), "
+            "'WOU_TEST_FAKE_PROVIDER_KEY' not in os.environ, "
+            "'HERMES_YOLO_MODE' not in os.environ, "
+            "'SSH_AUTH_SOCK' not in os.environ]\n"
+            "print(json.dumps({'ok': True, 'close': False, 'message': json.dumps(checks)}))\n",
+            encoding="utf-8",
+        )
+        handler.chmod(handler.stat().st_mode | stat.S_IEXEC)
+        self._write_action_handler_config(handler)
+        with self._patch_data_dir(), mock.patch.dict(os.environ, {
+            "WOU_TEST_FAKE_PROVIDER_KEY": "synthetic-only",
+            "HERMES_YOLO_MODE": "synthetic-only",
+            "SSH_AUTH_SOCK": "/synthetic/socket",
+        }):
+            tid = self._task_with_actions([{"id": "send", "label": "Send"}])
+            resp = self.client.post(f"/tasks/{tid}/actions/send")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(json.loads(resp.json()["message"]), [True] * 4)
+
+    def test_action_child_passes_only_explicit_handler_names(self):
+        handler = Path(self.data_dir) / "explicit_env.py"
+        handler.write_text(
+            f"#!{sys.executable}\nimport json, os\n"
+            "checks = [os.environ.get('WOU_TEST_ALLOWED') == 'synthetic-opt-in', "
+            "'WOU_TEST_FAKE_PROVIDER_KEY' not in os.environ, "
+            "'HERMES_YOLO_MODE' not in os.environ, bool(os.environ.get('PATH'))]\n"
+            "print(json.dumps({'ok': True, 'close': False, 'message': json.dumps(checks)}))\n",
+            encoding="utf-8",
+        )
+        handler.chmod(handler.stat().st_mode | stat.S_IEXEC)
+        self._write_action_handler_config(handler, env=["WOU_TEST_ALLOWED"])
+        with self._patch_data_dir(), mock.patch.dict(os.environ, {
+            "WOU_TEST_ALLOWED": "synthetic-opt-in",
+            "WOU_TEST_FAKE_PROVIDER_KEY": "synthetic-only",
+            "HERMES_YOLO_MODE": "synthetic-only",
+        }):
+            tid = self._task_with_actions([{"id": "send", "label": "Send"}])
+            resp = self.client.post(f"/tasks/{tid}/actions/send")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(json.loads(resp.json()["message"]), [True] * 4)
+
     def test_action_output_is_bounded(self):
         handler = Path(self.data_dir) / "verbose.py"
         handler.write_text(

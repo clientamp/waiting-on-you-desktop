@@ -38,8 +38,36 @@ def test_handler_longest_prefix_and_timeout_bounds():
     }})
     assert handlers["mailhist:"]["timeout_seconds"] == 1
     assert match_action_handler(handlers, "mailhist:cc:client@example.com") == {
-        "command": ["/usr/bin/python3", "/cc.py"], "timeout_seconds": 300,
+        "command": ["/usr/bin/python3", "/cc.py"], "timeout_seconds": 300, "env": [],
     }
+
+
+def test_handler_env_defaults_empty_and_keeps_explicit_names():
+    handlers = normalized_action_handlers({"action_handlers": {
+        "default:": {"command": ["/handler"]},
+        "explicit:": {"command": ["/handler"], "env": ["WOU_TEST_ALLOWED"]},
+    }})
+    assert handlers["default:"]["env"] == []
+    assert handlers["explicit:"]["env"] == ["WOU_TEST_ALLOWED"]
+
+
+@pytest.mark.parametrize("env", [
+    None, "PATH", {}, [123], [""], ["lower_case"], ["UPPER-NAME"],
+    ["NAME=VALUE"], [" NAME"], ["NAME\n"], ["1NAME"], ["Á_NAME"],
+    ["A" * 129], ["VALID", "not_valid"], [f"NAME_{i}" for i in range(33)],
+])
+def test_handler_rejects_invalid_env_names_or_bounds(env):
+    assert normalized_action_handlers({"action_handlers": {
+        "handler:": {"command": ["/handler"], "env": env},
+    }}) == {}
+
+
+def test_handler_env_accepts_count_and_length_boundaries():
+    names = ["A" * 128, "_NAME"] + [f"NAME_{i}" for i in range(30)]
+    handler = normalized_action_handlers({"action_handlers": {
+        "handler:": {"command": ["/handler"], "env": names},
+    }})["handler:"]
+    assert handler["env"] == names
 
 
 def test_external_producer_signature_and_actions(tmp_path):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -78,13 +79,19 @@ def normalized_action_handlers(config: dict[str, Any]) -> dict[str, dict[str, An
             continue
         if not os.path.isabs(command[0]):
             continue
+        env = entry.get("env", [])
+        if not isinstance(env, list) or len(env) > 32:
+            continue
+        if not all(isinstance(name, str) and len(name) <= 128
+                   and re.fullmatch(r"[A-Z_][A-Z0-9_]*", name) for name in env):
+            continue
         timeout_raw = entry.get("timeout_seconds", 60)
         try:
             timeout = int(timeout_raw)
         except (TypeError, ValueError):
             timeout = 60
         timeout = max(1, min(300, timeout))
-        out[prefix] = {"command": list(command), "timeout_seconds": timeout}
+        out[prefix] = {"command": list(command), "timeout_seconds": timeout, "env": list(env)}
     return out
 
 

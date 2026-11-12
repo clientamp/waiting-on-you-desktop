@@ -711,10 +711,13 @@ def run_remote(
             ]
         ),
     ]
+    from .child_env import child_env
+
     err: list[str] = []
     try:
         proc = subprocess.run(
             cmd,
+            env=child_env(ssh=True),
             input=module_src,
             capture_output=True,
             text=True,
