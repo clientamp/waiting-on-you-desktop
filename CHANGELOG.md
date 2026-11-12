@@ -7,6 +7,10 @@
 - Read-only SSH collection (`collect.remote_hosts`) still works and stays off until you add a host
 - Chat links open other agents' chats through the public SDK `host.openSession` with `intent: 'window'`, the chat's profile and route. No private Desktop bridge is used. Hosts without window support may open a tab; hosts without `host.openSession` navigate in place
 - Still requires Hermes 0.21.5 or newer
+- SSH collection and card action handlers start with a small environment (`PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_*`, `TMPDIR`, `TZ`). SSH also gets `SSH_AUTH_SOCK`. By default, API keys and other variables from the Hermes process are no longer passed
+- Card action handlers take an optional `env` list of exact variable names to pass (default empty, up to 32 names, no wildcards). An invalid list drops the handler
+- Declares PyYAML (`>=6,<7`), which the plugin already used to read Hermes `config.yaml`
+- SECURITY.md and README now list every read and write: Hermes `projects.db` and `config.yaml` reads, decision settings saved through Hermes plugin config, panel answers, chat archive, the one-time project backup, and card action commands
 
 ## 1.0.1 — 2026-11-11
 
@@ -23,7 +27,7 @@
 - Close all tasks in a chat from right-click, Shift-F10 or the … menu, with confirm and undo
 - Working badge on the focused chat while its agent is mid-turn; read and responded state show as unknown rather than guessed
 - `wou_list` returns only the current Hermes profile's tasks
-- Upgrades abort without deleting anything if the database backup fails
+- The one-time move to Hermes Projects backs up the task database first and deletes nothing if that backup fails. Other upgrades do not take a backup
 
 - Reads Desktop and terminal chats that newer Hermes saves under the `local` label, and warns in the panel if Hermes changes chat labels again
 - Open session works for profile chats with the newer `local-…` chat ids

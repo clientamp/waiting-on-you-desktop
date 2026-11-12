@@ -24,6 +24,14 @@ What you get instead: optional read-only SSH collection through `collect.remote_
 
 Do not register token-authenticated routes through private Hermes modules.
 
+## Card action handlers are not sandboxed
+
+Waiting On You does not limit a handler's file or network access. A card action handler runs as the user running Hermes and can read, write and connect wherever that user can.
+
+What you get instead: no shell, an absolute command path, a timeout, capped output, and a small environment. Only `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_*`, `TMPDIR` and `TZ` pass by default. Extra variables pass only when you list their exact names in the handler's `env`; there are no wildcards. Naming a credential or a variable that changes how a tool behaves hands it to that command.
+
+Configure only handlers you trust.
+
 ## Opening another agent's chat
 
 Chat links call the public SDK `host.openSession(sessionId, { intent: 'window', profile, route })`. Waiting On You does not use a private Desktop bridge. If the host cannot open a separate window, the SDK may open the chat in a tab instead. On a host without `host.openSession`, the link navigates to the chat in place.

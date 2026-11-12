@@ -89,14 +89,19 @@ Before you tap **Start**, the panel explains what the plugin does, which model w
 Outbound paths (no telemetry):
 
 - **Classifier:** sends the last user message (up to 300 characters), last agent reply (up to 1500), chat title/date/project, unfinished (open or snoozed) task text, ten recent closed asks, your priority note, and up to eight priority corrections to Hermes’s configured `waiting_on_you` model (main model by default).
-- **Priority calibration:** each classification prompt can include up to 8 of your own priority corrections from other chats (task ask + chosen quadrant) as calibration examples. These go to the classifier model and optional decision provider.
+- **Priority calibration:** each classification prompt can include up to 8 of your own priority corrections from other chats or this one (task ask + chosen quadrant, plus its context) as calibration examples. It uses the most recent ones. These go to the classifier model and optional decision provider.
 - **Rename with AI:** sends the first two and last 30 chat messages, up to 600 characters each, plus task/group naming context to that Hermes model.
 - **Suggest tags:** sends up to 200 recent chat titles, project names, and existing tag names to that Hermes model.
 - **Priority evaluation:** on explicit confirmation, sends chat excerpts and task context through the classifier and optional decision provider to compare predictions with labels. Evaluated tasks’ labels are held out of calibration examples.
 - **Optional decision provider:** receives chat excerpts for gating; asks, context, due dates, projects, priority note/corrections, and tag names/hints for priority/tag scoring. Preset hosts: `api.typesafe.ai`, `api.cloudflare.com`, `api.perplexity.ai`, `api.openai.com`; Ollama/custom uses your configured endpoint. Connection tests send synthetic data only.
-- **SSH collection (optional, off by default):** reads chat databases on remote hosts you list under `remote_hosts`, read-only. Nothing is written on those hosts.
+- **SSH collection (optional, off by default):** runs `python3` over SSH on hosts you list under `remote_hosts` to read that host's `state.db` and `projects.db`, read-only. Nothing is written on those hosts.
+- **Card action handlers (optional):** commands you configure can make their own network calls. See [Card actions](#card-actions).
 
 Model-backed chat features require first-run consent. Choose providers and SSH hosts you trust.
+
+The daily limit applies to background scans and **Scan now**. It does not stop **Rename with AI**, **Suggest tags**, priority evaluation or decision provider calls.
+
+The plugin also reads Hermes `projects.db` beside each `state.db` and the `waiting_on_you` model setting in `config.yaml`. It writes decision provider settings through Hermes plugin config. See [SECURITY.md](SECURITY.md) for every read and write.
 
 Tasks and settings live under `~/.hermes/plugin-data/waiting-on-you/` (files are created mode `0600` where the OS allows).
 
@@ -138,7 +143,7 @@ Enter keys in **Hermes Desktop → Settings → Plugins → Waiting On You**. Yo
 
 OpenAI publishes **$0.10 per million input tokens, with free output**, for `gpt-6-luna`. For all other providers, **see provider pricing**; prices and model access can change.
 
-Provider, model, endpoint, account ID, and timeout stay in Hermes’s plugin configuration (`plugins.entries.waiting-on-you-desktop.settings`; an older `plugins.entries.waiting-on-you.settings` block is still read), read and written through `ctx.get_config()` / `ctx.set_config()`. The panel’s gate, priority, and automatic-tagging switches stay in the plugin’s `settings.json`. Keys stay only in Hermes credential storage, never either settings file.
+Provider, model, endpoint, account ID, and timeout stay in Hermes’s plugin configuration (`plugins.entries.waiting-on-you-desktop.settings`; an older `plugins.entries.waiting-on-you.settings` block is still read). The plugin reads all five from Hermes’s configuration. When you save decision settings, it writes only provider, model, endpoint and account ID through `ctx.set_config()`; the timeout (`decision_timeout`, default 20 seconds) is read but never written by the plugin. The panel’s gate, priority, and automatic-tagging switches stay in the plugin’s `settings.json`. Keys stay only in Hermes credential storage, never either settings file.
 
 **Privacy:** enabling a decision provider sends chat titles and message excerpts to that provider for the gate. Priority and tag scoring send task text, context, due dates, project names, your priority note, and up to eight recent priority corrections. Choose a provider you trust with that information. Decision errors are stored only as short codes such as `timeout` or `http_401`, never request content or keys.
 
@@ -164,7 +169,7 @@ Read-only, compact output: `{"total": N, "tasks": [...]}`. Returns the 20 most i
 
 Optional arguments: `quadrant` (1–4), `limit` (1–200), `project` (exact name or key, case-insensitive), and `tag` (exact name, case-insensitive). Filters combine; `total` counts all matching tasks before the limit. Example: `{"project":"default:project-id","tag":"Client","limit":10}`.
 
-Projects come only from Hermes, never the classifier. Keys are `<profile>:<project_id>`. No manual project override exists. First use of this version backs up the old task database beside itself as `wou.db.bak-pre-hermes-projects-<timestamp>`, then removes the plugin’s old project assignments. The old table is retained empty.
+Projects come only from Hermes, never the classifier. Keys are `<profile>:<project_id>`. No manual project override exists. The first time a task database opens without the Hermes Projects marker, the plugin backs it up beside itself as `wou.db.bak-pre-hermes-projects-<timestamp>`, then removes the plugin’s old project assignments. The old table is retained empty. This runs once per database; later upgrades do not take a backup.
 
 ## Settings
 
@@ -215,7 +220,8 @@ Plugin config JSON (Hermes plugin config, not `settings.json`) nests collection 
   "action_handlers": {
     "support:inbox:": {
       "command": ["/absolute/path/to/handler"],
-      "timeout_seconds": 60
+      "timeout_seconds": 60,
+      "env": []
     }
   }
 }
@@ -255,6 +261,10 @@ In `config.json`, map a **chat_key prefix** to a local handler (no shell):
 
 Longest matching prefix wins. Only **open** tasks with a stored `run` action can execute a handler. The command must be a non-empty argv list starting with an absolute executable path; it runs without a shell, with a timeout clamped to 1–300 seconds (60 by default). Both stdout and stderr are capped at 64 KiB; oversized output fails the action.
 
+Handlers start with a small environment: `PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_*`, `TMPDIR` and `TZ`. Other variables from the Hermes process, including API keys, are not passed. To pass more, list exact variable names in `env` (default `[]`). The list can hold up to 32 names. Each name is at most 128 characters of uppercase ASCII letters, digits and underscores, and cannot start with a digit (`[A-Z_][A-Z0-9_]*`). There are no wildcards. An invalid `env` list drops the whole handler. Every name you add is handed to that command, so a credential or a variable that changes how a tool behaves gives the command that power. Add only what the handler needs.
+
+A handler does whatever its command does, including its own network calls and file changes. The plugin does not limit them.
+
 On **Run**, the plugin executes `command` with argv: `action_id`, `chat_key`, `source_msg_id` (or empty). A source id must be empty/None or at most 128 characters from `A-Z a-z 0-9 _ . : @ < > + = , -`, must not start with `-`, and cannot contain whitespace or control characters. This accepts producer ids such as `cc_reminders:123`, `client_questions:42`, and comma-separated reminder ids. Read the **last non-empty stdout line** as JSON: `{"ok": bool, "message": str, "close": bool}`. When `ok` and `close` are true, the task is marked done (chats are not archived for non-chat keys).
 
 ## Keyboard shortcuts
@@ -291,6 +301,8 @@ The same actions are available from the command palette.
 ## Other machines
 
 Waiting On You reads every Hermes profile on the Mac where it runs. To include chats from another machine, add it under `remote_hosts` in `config.json` (see [Advanced config](#advanced-config-configjson)). The plugin then reads that machine's `state.db` over SSH, read-only. SSH collection is off until you add a host.
+
+SSH starts with a small environment plus `SSH_AUTH_SOCK`, so your SSH agent still works. Other variables from the Hermes process are not passed.
 
 Satellite pairing, where a small plugin on another Hermes pushed its chats to this one, is not part of this release. No pairing or push endpoints ship, and **Settings** has no Other machines section. Pairing can return only after Hermes supports token-authenticated plugin routes through a public API ([hermes-agent#151760](https://github.com/NousResearch/hermes-agent/pull/151760), [hermes-agent#143507](https://github.com/NousResearch/hermes-agent/issues/143507)). If you paired machines with an earlier version, remove the satellite plugin from them. Existing satellite records in `wou.db` are left in place and ignored.
 
