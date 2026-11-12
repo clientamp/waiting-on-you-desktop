@@ -131,6 +131,17 @@ export async function openChat(
       route = pickRoute(routes, plan.profile, plan.connection, host.state.connectionId.get(), plan.aliases)
     }
 
+    if (!route && plan.connection) {
+      // Discovery may be unavailable; never lose an explicit remote owner and
+      // accidentally open a same-named profile on this window's connection.
+      route = {
+        connectionId: plan.connection,
+        mode: 'remote',
+        profile: plan.profile,
+        targetProfile: plan.profile,
+      }
+    }
+
     // Let the public SDK carry the owning profile/connection into a new window.
     // Old hosts without this SDK door retain the plain in-place fallback.
     if (typeof open !== 'function') {

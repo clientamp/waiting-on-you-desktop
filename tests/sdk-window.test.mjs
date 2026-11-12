@@ -46,6 +46,21 @@ test('another-profile chat without a registered route still uses the SDK profile
   assert.deepEqual(calls, [['session-123', { intent: 'window', profile: 'helper' }]])
 })
 
+test('explicit remote connection remains the window owner when route discovery is unavailable', async () => {
+  const calls = []
+  const { openChat } = await load({
+    openSession: async (...args) => calls.push(args), navigate() {},
+    state: { connectionId: { get: () => 'unrelated-hub' } },
+  })
+  await openChat({}, 'workstation:session-123', 'Remote chat', {
+    session_id: 'session-123', profile: 'helper', connection: 'workstation',
+  })
+  assert.deepEqual(calls, [['session-123', {
+    intent: 'window', profile: 'helper',
+    route: { connectionId: 'workstation', mode: 'remote', profile: 'helper', targetProfile: 'helper' },
+  }]])
+})
+
 test('hosts without the public SDK session method retain the in-place navigation fallback', async () => {
   const paths = []
   const { openChat } = await load({
